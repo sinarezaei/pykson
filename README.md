@@ -47,7 +47,7 @@ Use `Pykson` class to serialize `JsonObject`s to string
 Pykson.to_json(student)
 ```
 ## Fields
-It's possible to use `IntegerField`, `FloatField`, `BooleanField`, `StringField`, `ListField` and `ObjectListField``.
+It's possible to use `IntegerField`, `FloatField`, `BooleanField`, `StringField`, `ListField` and `ObjectListField`.
 There are four other types of fields which help with storing fields with specific integer or string values. To create a field with multiple choice integer values, use `MultipleChoiceIntegerField` or `EnumIntegerField` classes. To create a field with multiple choice string values, use `MultipleChoiceStringField` or `EnumStringField` classes.
 
 Example for MultipleChoiceStringField:
