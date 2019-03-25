@@ -50,7 +50,7 @@ Pykson.to_json(student)
 It's possible to use `IntegerField`, `FloatField`, `BooleanField`, `StringField`, `ListField` and `ObjectListField`.
 There are four other types of fields which help with storing fields with specific integer or string values. To create a field with multiple choice integer values, use `MultipleChoiceIntegerField` or `EnumIntegerField` classes. To create a field with multiple choice string values, use `MultipleChoiceStringField` or `EnumStringField` classes.
 
-Example for MultipleChoiceStringField:
+Example for `MultipleChoiceStringField`:
 ```python
 from pykson import MultipleChoiceStringField
 
@@ -60,7 +60,7 @@ class WeatherInfo(JsonObject):
 
 ```
 
-Example for EnumStringField:
+Example for `EnumStringField`:
 ```python
 from enum import Enum
 from pykson import EnumStringField
