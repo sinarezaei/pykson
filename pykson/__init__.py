@@ -19,7 +19,8 @@ class FieldType(Enum):
     STRING = 4
     LIST = 5
     DATE = 6
-    DATETIME = 7
+    TIME = 7
+    DATETIME = 8
 
 
 class Field(JsonSerializable):
@@ -208,6 +209,25 @@ class DateField(Field):
         self.date_format = date_format
 
 
+class TimeField(Field):
+    def get_json_formatted_value(self, value):
+        return datetime.time.strftime(value, self.time_format)
+
+    def __set__(self, instance, value):
+        if value is not None and isinstance(value, str):
+            try:
+                value = datetime.datetime.strptime(value, self.time_format).time()
+            except:
+                raise Exception('Error parsing time ' + str(value) + ' with given format ' + str(self.time_format))
+        if value is not None and not isinstance(value, datetime.time):
+            raise TypeError(instance, self.name, datetime.time, value)
+        super().__set__(instance, value)
+
+    def __init__(self, time_format: str = '%H:%M:%S', serialized_name: Optional[str] = None, null: bool = True):
+        super(TimeField, self).__init__(field_type=FieldType.TIME, serialized_name=serialized_name, null=null)
+        self.time_format = time_format
+
+
 class DateTimeField(Field):
     def get_json_formatted_value(self, value):
         if value is None:
@@ -334,7 +354,7 @@ class JsonObjectMeta(type):
 
             _setattr(instance_self, 'serialized_name', None)
 
-            model_field_names = [k for k in tmp_class_dict.keys() if isinstance(tmp_class_dict.get(k), Field) or isinstance(tmp_class_dict.get(k), JsonObject)]
+            model_field_names = [k for k in tmp_class_dict.keys() if (isinstance(tmp_class_dict.get(k), JsonSerializable))]
             for field_key in model_field_names:
                 if field_key not in init_kwargs.keys():
                     _setattr(instance_self, field_key, None)
@@ -532,11 +552,11 @@ class Pykson:
                         Pykson.from_json(data_value_item, fields_mapped_by_serialized_names[data_key].item_type)
                     )
                 data_copy[data_key] = data_list_value
-            elif isinstance(data_value, dict) and data_key in children_mapped_by_serialized_names.keys():
+            elif data_key in children_mapped_by_serialized_names.keys() and isinstance(data_value, dict):
                 data_copy[data_key] = Pykson.from_json(data_value, type(children_mapped_by_serialized_names[data_key]))
             elif data_key in fields_mapped_by_serialized_names.keys() and isinstance(fields_mapped_by_serialized_names[data_key], ObjectField):
                 # noinspection PyUnresolvedReferences
-                data_copy[data_key] = Pykson.from_json(data_value, fields_mapped_by_serialized_names[data_key].item_type)
+                data_copy[field_names_mapped_by_serialized_names[data_key]] = Pykson.from_json(data_value, fields_mapped_by_serialized_names[data_key].item_type)
             else:
                 if data_key in field_names_mapped_by_serialized_names.keys():
                     data_copy[field_names_mapped_by_serialized_names[data_key]] = data_value
