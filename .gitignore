@@ -3,6 +3,7 @@
 /dist
 __pycache__/
 setup.py
+*/sample.py
 
 # Compiled python modules.
 *.pyc

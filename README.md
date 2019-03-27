@@ -41,7 +41,7 @@ json_text = '{"first_name":"John", "last_name":"Smith", "age": 25, "scores": [ {
 student = Pykson.from_json(json_text, Student)
 ```
 
-### Serialize `JsonObject`s
+### Serialize objects
 Use `Pykson` class to serialize `JsonObject`s to string
 ```python
 Pykson.to_json(student)
