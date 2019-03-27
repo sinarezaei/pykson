@@ -549,7 +549,7 @@ class Pykson:
                     data_list_value.append(
                         Pykson.from_json(data_value_item, fields_mapped_by_serialized_names[data_key].item_type)
                     )
-                data_copy[data_key] = data_list_value
+                data_copy[field_names_mapped_by_serialized_names[data_key]] = data_list_value
             elif data_key in children_mapped_by_serialized_names.keys() and isinstance(data_value, dict):
                 data_copy[data_key] = Pykson.from_json(data_value, type(children_mapped_by_serialized_names[data_key]))
             elif data_key in fields_mapped_by_serialized_names.keys() and isinstance(fields_mapped_by_serialized_names[data_key], ObjectField):
