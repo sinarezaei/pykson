@@ -18,9 +18,15 @@ First, create your object model which extends `JsonObject`
 ```python
 from pykson import JsonObject, IntegerField, StringField, ObjectListField
 
+
+class Course(JsonObject):
+    name = StringField()
+    teacher = StringField()
+
+
 class Score(JsonObject):
     score = IntegerField()
-    course = StringField()
+    course = Course()
 
 
 class Student(JsonObject):
@@ -37,7 +43,7 @@ Use `Pykson` class to deserialize json string to `JsonObject`s
 ```python
 from pykson import Pykson
 
-json_text = '{"first_name":"John", "last_name":"Smith", "age": 25, "scores": [ {"course": "Algebra", "score": 100}, {"course": "Statistics", "score": 90} ]}'
+json_text = '{"first_name":"John", "last_name":"Smith", "age": 25, "scores": [ {"course": {"name": "Algebra", "teacher" :"Mr. Schmidt"}, "score": 100}, {"course": {"name": "Statistics", "teacher": "Mrs. Lee"}, "score": 90} ]}'
 student = Pykson.from_json(json_text, Student)
 ```
 
@@ -47,7 +53,8 @@ Use `Pykson` class to serialize `JsonObject`s to string
 Pykson.to_json(student)
 ```
 ## Fields
-It's possible to use `IntegerField`, `FloatField`, `BooleanField`, `StringField`, `ListField` and `ObjectListField`.
+There are different types of predefined fields: `IntegerField`, `FloatField`, `BooleanField`, `StringField`, `ListField`, `ObjectField`, `ObjectListField`, `DateField`, `TimeField`, `DateTimeField`, `TimestampSecondsField` and `TimestampMillisecondsField`.
+
 There are four other types of fields which help with storing fields with specific integer or string values. To create a field with multiple choice integer values, use `MultipleChoiceIntegerField` or `EnumIntegerField` classes. To create a field with multiple choice string values, use `MultipleChoiceStringField` or `EnumStringField` classes.
 
 Example for `MultipleChoiceStringField`:
@@ -83,16 +90,27 @@ class WeatherInfo(JsonObject):
 ### Serialized names
 It is possible to use change name of fields during serialization/deserialization. For this purpose, use `serialized_name` input in the fields
 ```python
+from pykson import Pykson, JsonObject, IntegerField, StringField, ObjectField
+class Score(JsonObject):
+    score = IntegerField(serialized_name="s")
+    course = StringField(serialized_name="c")
+
+
 class Student(JsonObject):
 
     first_name = StringField(serialized_name="fn")
     last_name = StringField(serialized_name="ln")
     age = IntegerField(serialized_name="a")
+    score = ObjectField(Score, serialized_name="s")
 
 
-json_text = '{"fn":"John", "ln":"Smith", "a": 25}'
+json_text = '{"fn":"John", "ln":"Smith", "a": 25, "s": {"s": 100, "c":"Algebra"}}'
 student = Pykson.from_json(json_text, Student)
 ```
+
+### Work with dates and datetimes
+Pykson currenty has five fields for handling `date`s and `datetime`s.
+Three of them, `DateField`, `TimeField` and `DateTimeField`, use date/time formats to serialize/deserialize values. The other ones, `TimestampSecondsField` and `TimestampMillisecondsField` use integer values to serialize/deserialize datetimes.
 
 [pypi_version]: https://img.shields.io/pypi/v/pykson.svg "PYPI version"
 [licence_version]: https://img.shields.io/badge/license-MIT%20v2-brightgreen.svg "MIT Licence"
