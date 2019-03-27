@@ -1,7 +1,9 @@
 from enum import Enum
 from typing import Dict, Any, Tuple, List, Optional, TypeVar, Union, Type, Set
 import six
+import pytz
 import json
+import datetime
 
 name = "pykson"
 
@@ -12,20 +14,25 @@ class FieldType(Enum):
     BOOLEAN = 3
     STRING = 4
     LIST = 5
+    DATE = 6
+    DATETIME = 7
 
 
 class Field:
+    # noinspection PyMethodMayBeStatic
+    def get_json_formatted_value(self, value):
+        return value
 
     # noinspection PyProtectedMember
     def __get__(self, instance, owner):
         if instance is None:
             raise Exception('Cannot access field without instance')
-        return instance._data[self.serialized_name]
+        return instance._data.get(self.serialized_name, None)
 
     # noinspection PyProtectedMember
     def __set__(self, instance, value):
         if not self.null:
-            assert value is not None, "Null value for not nullable field: " + self.serialized_name
+            assert value is not None, "Null value passed for not nullable field \'" + self.name + "\' in class " + str(type(instance))
         if instance is None:
             raise Exception('Cannot access field without instance')
         instance._data[self.serialized_name] = value
@@ -185,6 +192,90 @@ class EnumIntegerField(Field):
                 raise Exception("Invalid value in enum integer field, " + str(option) + ', expected int value but found ' + str(type(option)))
         self.options = set(options)
 
+
+class DateField(Field):
+
+    def get_json_formatted_value(self, value):
+        return datetime.date.strftime(value, self.date_format)
+
+    def __set__(self, instance, value):
+        if value is not None and isinstance(value, str):
+            try:
+                value = datetime.datetime.strptime(value, self.date_format).date()
+            except:
+                raise Exception('Error parsing date ' + str(value) + ' with given format ' + str(self.date_format))
+        if value is not None and not isinstance(value, datetime.date):
+            raise TypeError(instance, self.name, datetime.date, value)
+        super().__set__(instance, value)
+
+    def __init__(self, date_format: str = '%Y-%m-%d', serialized_name: Optional[str] = None, null: bool = True):
+        super(DateField, self).__init__(field_type=FieldType.DATE, serialized_name=serialized_name, null=null)
+        self.date_format = date_format
+
+
+class DateTimeField(Field):
+
+    def get_json_formatted_value(self, value):
+        if value is None:
+            return None
+        return datetime.datetime.strftime(value, self.datetime_format)
+
+    def __set__(self, instance, value):
+        if value is not None and isinstance(value, str):
+            try:
+                value = datetime.datetime.strptime(value, self.datetime_format).astimezone(pytz.timezone(self.datetime_timezone))
+            except:
+                raise Exception('Error parsing date ' + str(value) + ' with given format ' + str(self.datetime_format))
+        if value is not None and not isinstance(value, datetime.datetime):
+            raise TypeError(instance, self.name, datetime.datetime, value)
+        super().__set__(instance, value)
+
+    def __init__(self, datetime_format: str = '%Y-%m-%d %H:%M:%S', datetime_timezone: str = 'UTC', serialized_name: Optional[str] = None, null: bool = True):
+        super(DateTimeField, self).__init__(field_type=FieldType.DATETIME, serialized_name=serialized_name, null=null)
+        self.datetime_format = datetime_format
+        self.datetime_timezone = datetime_timezone
+
+
+class TimestampSecondsField(Field):
+
+    def get_json_formatted_value(self, value):
+        return int(value.replace(tzinfo=pytz.timezone(self.datetime_timezone)).timestamp())
+
+    def __set__(self, instance, value):
+        if value is not None and isinstance(value, int):
+            try:
+                value = datetime.datetime.fromtimestamp(float(value)).astimezone(pytz.timezone(self.datetime_timezone))
+            except:
+                raise Exception('Error parsing timestamp (in seconds) ' + str(value))
+        if value is not None and not isinstance(value, datetime.datetime):
+            raise TypeError(instance, self.name, datetime.datetime, value)
+        super().__set__(instance, value)
+
+    def __init__(self, datetime_timezone: str = 'UTC', serialized_name: Optional[str] = None, null: bool = True):
+        super(TimestampSecondsField, self).__init__(field_type=FieldType.DATETIME, serialized_name=serialized_name, null=null)
+        self.datetime_timezone = datetime_timezone
+
+
+class TimestampMillisecondsField(Field):
+
+    def get_json_formatted_value(self, value):
+        return int(value.replace(tzinfo=pytz.timezone(self.datetime_timezone)).timestamp() * 1000.0)
+
+    def __set__(self, instance, value):
+        if value is not None and isinstance(value, int):
+            try:
+                value = datetime.datetime.fromtimestamp(float(value/1000.0)).astimezone(pytz.timezone(self.datetime_timezone))
+            except:
+                raise Exception('Error parsing timestamp (in milliseconds) ' + str(value))
+        if value is not None and not isinstance(value, datetime.datetime):
+            raise TypeError(instance, self.name, datetime.datetime, value)
+        super().__set__(instance, value)
+
+    def __init__(self, datetime_timezone: str = 'UTC', serialized_name: Optional[str] = None, null: bool = True):
+        super(TimestampMillisecondsField, self).__init__(field_type=FieldType.DATETIME, serialized_name=serialized_name, null=null)
+        self.datetime_timezone = datetime_timezone
+
+
 F = TypeVar('F', bound=Field)
 
 
@@ -224,10 +315,14 @@ class JsonObjectMeta(type):
         else:
             meta = attr_meta
 
+        serialized_names = []
         for field_name, field in attrs.items():
             if isinstance(field, Field):
                 if field.serialized_name is None:
                     field.serialized_name = field_name
+                if field.serialized_name in serialized_names:
+                    raise Exception('Duplicate serialized names \'' + str(field.serialized_name) + '\' found in ' + str(name) + ' class' )
+                serialized_names.append(field.serialized_name)
                 field.name = field_name
                 setattr(new_class, field.name, field)
             else:
@@ -238,6 +333,10 @@ class JsonObjectMeta(type):
             instance_self._data = {}  # dict.fromkeys(attrs.keys())
             tmp_class_dict = instance_self.__class__.__dict__
             model_field_names = [k for k in tmp_class_dict.keys() if isinstance(tmp_class_dict.get(k), Field)]
+            for field_key in model_field_names:
+                if field_key not in init_kwargs.keys():
+                    setattr(instance_self, field_key, None)
+
             for key, value in init_kwargs.items():
                 if key in model_field_names:
                     setattr(instance_self, key, value)
@@ -333,7 +432,7 @@ class JsonObject(six.with_metaclass(JsonObjectMeta)):
                 field_name = field.name
                 field_serialized_name = field.serialized_name
                 field_value = self.__getattribute__(field_name)
-                fields_dict[field_serialized_name] = field_value
+                fields_dict[field_serialized_name] = field.get_json_formatted_value(field_value)
         return fields_dict
 
 
