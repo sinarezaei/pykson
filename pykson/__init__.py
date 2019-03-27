@@ -370,7 +370,7 @@ class JsonObjectMeta(type):
         return new_class
 
 
-class JsonObject(six.with_metaclass(JsonObjectMeta,JsonSerializable)):
+class JsonObject(six.with_metaclass(JsonObjectMeta, JsonSerializable)):
     # noinspection PyUnusedLocal
     def __init__(self, accept_unknown: bool = False, *args, **kwargs):
         super(JsonObject, self).__init__()
@@ -409,27 +409,27 @@ class JsonObject(six.with_metaclass(JsonObjectMeta,JsonSerializable)):
         # if kwargs and accept_unknown:
         #     raise TypeError("'%s' is an invalid keyword argument for this function" % list(kwargs)[0])
 
-    # def get_field_values_as_dict(self) -> Dict[str, Any]:
-    #     fields_dict = {}
-    #     type_dicts = type(self).__dict__
-    #     for n, field in type_dicts.items():
-    #         if isinstance(field, Field):
-    #             field_name = field.name
-    #             field_serialized_name = field.serialized_name
-    #             field_value = self.__getattribute__(field_name)
-    #             fields_dict[field_serialized_name] = field.get_json_formatted_value(field_value)
-    #     return fields_dict
-    #
-    # def get_child_values_as_dict(self) -> Dict[str, Any]:
-    #     child_dict = {}
-    #     type_dicts = type(self).__dict__
-    #     for n, child in type_dicts.items():
-    #         if isinstance(child, JsonObject):
-    #             field_name = child.serialized_name
-    #             field_serialized_name = child.serialized_name
-    #             field_value = self.__getattribute__(field_name)
-    #             child_dict[field_serialized_name] = field_value
-    #     return child_dict
+        # def get_field_values_as_dict(self) -> Dict[str, Any]:
+        #     fields_dict = {}
+        #     type_dicts = type(self).__dict__
+        #     for n, field in type_dicts.items():
+        #         if isinstance(field, Field):
+        #             field_name = field.name
+        #             field_serialized_name = field.serialized_name
+        #             field_value = self.__getattribute__(field_name)
+        #             fields_dict[field_serialized_name] = field.get_json_formatted_value(field_value)
+        #     return fields_dict
+        #
+        # def get_child_values_as_dict(self) -> Dict[str, Any]:
+        #     child_dict = {}
+        #     type_dicts = type(self).__dict__
+        #     for n, child in type_dicts.items():
+        #         if isinstance(child, JsonObject):
+        #             field_name = child.serialized_name
+        #             field_serialized_name = child.serialized_name
+        #             field_value = self.__getattribute__(field_name)
+        #             child_dict[field_serialized_name] = field_value
+        #     return child_dict
 
 
 T = TypeVar('T', bound=JsonObject)
@@ -583,7 +583,7 @@ class Pykson:
             raise Exception('Unable to parse data')
 
     @staticmethod
-    def to_json(item: T) -> str:
+    def __item_to_dict(item: T) -> Dict[str, Any]:
         fields_dict = Pykson.__get_field_and_child_values_as_dict(item)
         final_dict = {}
         for field_key, field_value in fields_dict.items():
@@ -599,4 +599,29 @@ class Pykson:
                 final_dict[field_key] = list_value
             else:
                 final_dict[field_key] = field_value
-        return json.dumps(final_dict)
+        return final_dict
+
+    @staticmethod
+    def to_json(item: Union[T, List[T]]) -> str:
+        if isinstance(item, list):
+            final_list = []
+            for i in item:
+                final_list.append(Pykson.__item_to_dict(i))
+            return json.dumps(final_list)
+        else:
+            fields_dict = Pykson.__get_field_and_child_values_as_dict(item)
+            final_dict = {}
+            for field_key, field_value in fields_dict.items():
+                if isinstance(field_value, JsonObject):
+                    final_dict[field_key] = Pykson.to_json(field_value)
+                elif isinstance(field_value, list):
+                    list_value = []
+                    for item in field_value:
+                        if isinstance(item, JsonObject):
+                            list_value.append(Pykson.to_json(item))
+                        else:
+                            list_value.append(item)
+                    final_dict[field_key] = list_value
+                else:
+                    final_dict[field_key] = field_value
+            return json.dumps(final_dict)
