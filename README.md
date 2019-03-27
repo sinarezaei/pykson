@@ -53,7 +53,8 @@ Use `Pykson` class to serialize `JsonObject`s to string
 Pykson.to_json(student)
 ```
 ## Fields
-It's possible to use `IntegerField`, `FloatField`, `BooleanField`, `StringField`, `ListField` and `ObjectListField`.
+There are different types of predefined fields: `IntegerField`, `FloatField`, `BooleanField`, `StringField`, `ListField`, `ObjectField`, `ObjectListField`, `DateField`, `TimeField`, `DateTimeField`, `TimestampSecondsField` and `TimestampMillisecondsField`.
+
 There are four other types of fields which help with storing fields with specific integer or string values. To create a field with multiple choice integer values, use `MultipleChoiceIntegerField` or `EnumIntegerField` classes. To create a field with multiple choice string values, use `MultipleChoiceStringField` or `EnumStringField` classes.
 
 Example for `MultipleChoiceStringField`:
@@ -106,6 +107,10 @@ class Student(JsonObject):
 json_text = '{"fn":"John", "ln":"Smith", "a": 25, "s": {"s": 100, "c":"Algebra"}}'
 student = Pykson.from_json(json_text, Student)
 ```
+
+### Work with dates and datetimes
+Pykson currenty has five fields for handling `date`s and `datetime`s.
+Three of them, `DateField`, `TimeField` and `DateTimeField`, use date/time formats to serialize/deserialize values. The other ones, `TimestampSecondsField` and `TimestampMillisecondsField` use integer values to serialize/deserialize datetimes.
 
 [pypi_version]: https://img.shields.io/pypi/v/pykson.svg "PYPI version"
 [licence_version]: https://img.shields.io/badge/license-MIT%20v2-brightgreen.svg "MIT Licence"
