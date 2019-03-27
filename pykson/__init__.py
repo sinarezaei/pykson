@@ -536,9 +536,7 @@ class Pykson:
 
     # noinspection PyCallingNonCallable
     @staticmethod
-    def from_json(data: Union[str, Dict], cls: Type[T], accept_unknown: bool = False) -> T:
-        if isinstance(data, str):
-            data = json.loads(data)
+    def from_json_dict(data: Dict, cls: Type[T], accept_unknown: bool = False) -> T:
         children_mapped_by_serialized_names = Pykson.__get_children_mapped_by_serialized_names(cls)
         fields_mapped_by_serialized_names = Pykson.__get_fields_mapped_by_serialized_names(cls)
         field_names_mapped_by_serialized_names = Pykson.__get_field_names_mapped_by_serialized_names(cls)
@@ -563,6 +561,26 @@ class Pykson:
                 else:
                     data_copy[data_key] = data_value
         return cls(accept_unknown=accept_unknown, **data_copy)
+
+    # noinspection PyCallingNonCallable
+    @staticmethod
+    def from_json_list(data: List, cls: Type[T], accept_unknown: bool = False) -> List[T]:
+        list_result = []  # type: List[T]
+        for data_value_item in data:
+            # noinspection PyUnresolvedReferences
+            list_result.append(Pykson.from_json_dict(data_value_item, cls, accept_unknown))
+        return list_result
+
+    @staticmethod
+    def from_json(data: Union[str, Dict, List], cls: Type[T], accept_unknown: bool = False) -> Union[T, List[T]]:
+        if isinstance(data, str):
+            data = json.loads(data)
+        if isinstance(data, dict):
+            return Pykson.from_json_dict(data, cls, accept_unknown)
+        elif isinstance(data, list):
+            return Pykson.from_json_list(data, cls, accept_unknown)
+        else:
+            raise Exception('Unable to parse data')
 
     @staticmethod
     def to_json(item: T) -> str:
