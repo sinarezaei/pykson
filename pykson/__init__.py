@@ -579,6 +579,8 @@ class Pykson:
             return Pykson.from_json_dict(data, cls, accept_unknown)
         elif isinstance(data, list):
             return Pykson.from_json_list(data, cls, accept_unknown)
+        elif isinstance(data, type(None)):
+            return None
         else:
             raise Exception('Unable to parse data')
 
