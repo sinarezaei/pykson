@@ -547,14 +547,14 @@ class Pykson:
                 for data_value_item in data_value:
                     # noinspection PyUnresolvedReferences
                     data_list_value.append(
-                        Pykson.from_json(data_value_item, fields_mapped_by_serialized_names[data_key].item_type)
+                        Pykson.from_json(data_value_item, fields_mapped_by_serialized_names[data_key].item_type, accept_unknown=accept_unknown)
                     )
                 data_copy[field_names_mapped_by_serialized_names[data_key]] = data_list_value
             elif data_key in children_mapped_by_serialized_names.keys() and isinstance(data_value, dict):
-                data_copy[data_key] = Pykson.from_json(data_value, type(children_mapped_by_serialized_names[data_key]))
+                data_copy[data_key] = Pykson.from_json(data_value, type(children_mapped_by_serialized_names[data_key]), accept_unknown=accept_unknown)
             elif data_key in fields_mapped_by_serialized_names.keys() and isinstance(fields_mapped_by_serialized_names[data_key], ObjectField):
                 # noinspection PyUnresolvedReferences
-                data_copy[field_names_mapped_by_serialized_names[data_key]] = Pykson.from_json(data_value, fields_mapped_by_serialized_names[data_key].item_type)
+                data_copy[field_names_mapped_by_serialized_names[data_key]] = Pykson.from_json(data_value, fields_mapped_by_serialized_names[data_key].item_type, accept_unknown=accept_unknown)
             else:
                 if data_key in field_names_mapped_by_serialized_names.keys():
                     data_copy[field_names_mapped_by_serialized_names[data_key]] = data_value
