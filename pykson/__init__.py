@@ -381,7 +381,7 @@ class JsonObject(six.with_metaclass(JsonObjectMeta, JsonSerializable)):
         # Empty init will be replaced by meta class
         super(JsonObject, self).__init__()
 
-        
+
 T = TypeVar('T', bound=JsonObject)
 
 
@@ -413,7 +413,6 @@ class ObjectListField(Field):
 
 
 class Pykson:
-
     @staticmethod
     def __get_fields_mapped_by_names(cls) -> Dict[str, Field]:
         result_dict = {}
@@ -506,7 +505,8 @@ class Pykson:
                 data_copy[data_key] = Pykson.from_json(data_value, type(children_mapped_by_serialized_names[data_key]), accept_unknown=accept_unknown)
             elif data_key in fields_mapped_by_serialized_names.keys() and isinstance(fields_mapped_by_serialized_names[data_key], ObjectField):
                 # noinspection PyUnresolvedReferences
-                data_copy[field_names_mapped_by_serialized_names[data_key]] = Pykson.from_json(data_value, fields_mapped_by_serialized_names[data_key].item_type, accept_unknown=accept_unknown)
+                data_copy[field_names_mapped_by_serialized_names[data_key]] = Pykson.from_json(data_value, fields_mapped_by_serialized_names[data_key].item_type,
+                                                                                               accept_unknown=accept_unknown)
             else:
                 if data_key in field_names_mapped_by_serialized_names.keys():
                     data_copy[field_names_mapped_by_serialized_names[data_key]] = data_value
@@ -583,4 +583,3 @@ class Pykson:
     @staticmethod
     def to_json(item: Union[T, List[T]]) -> str:
         return json.dumps(Pykson._to_json(item))
-
