@@ -112,5 +112,14 @@ student = Pykson.from_json(json_text, Student)
 Pykson currenty has five fields for handling `date`s and `datetime`s.
 Three of them, `DateField`, `TimeField` and `DateTimeField`, use date/time formats to serialize/deserialize values. The other ones, `TimestampSecondsField` and `TimestampMillisecondsField` use integer values to serialize/deserialize datetimes.
 
+
+### Accept unknown key/value pairs when deserializing
+`from_json` method currently has an input parameter named `accept_unknown` with default value of `false`. If you want to deserialize an string to a `JsonObject` and ignore unknown keys which are not defined in your model class as fields, you can set this parameter to `true`. If this parameter is false, an error is raised when facing an unknown key in the json.
+
+```
+json_text = '{"fn":"John", "ln":"Smith", "a": 25, "up":"some unknown parameter", "s": {"s": 100, "c":"Algebra"}}'
+student = Pykson.from_json(json_text, Student, accept_unknown=True)
+```
+
 [pypi_version]: https://img.shields.io/pypi/v/pykson.svg "PYPI version"
 [licence_version]: https://img.shields.io/badge/license-MIT%20v2-brightgreen.svg "MIT Licence"
