@@ -378,65 +378,10 @@ class JsonObjectMeta(type):
 class JsonObject(six.with_metaclass(JsonObjectMeta, JsonSerializable)):
     # noinspection PyUnusedLocal
     def __init__(self, accept_unknown: bool = False, *args, **kwargs):
+        # Empty init will be replaced by meta class
         super(JsonObject, self).__init__()
-        # field_names = []
-        # _setattr = setattr
-        #
-        # # Note: maybe ? save all timestamps as utc in database. Convert them to appropriate timezones when needed in python.
-        # #       By default, InfluxDB stores and returns timestamps in UTC.
-        # #
-        # # influx has timezones:
-        # # https://docs.influxdata.com/influxdb/v1.7/query_language/data_exploration/#the-time-zone-clause
-        # # I tested and it supports timezones. But there is something wrong with python client.
-        # # >>> If I give a datetime with timezone to python client, it still stores it in db with utc.
-        # #     the time is not wrong but it when u query that data point again,
-        # #     it does not give it with the timezone we gave it in first place.
-        # #
-        # #
-        # # I think it is better to save times in utc and then convert it on client side (python).
-        # # because when I insert a point from python influx client with timezone offset (+03:30 for example),
-        # # it gets saved in the database as a utc. see:
-        # # https://stackoverflow.com/questions/39736238/how-to-set-time-zone-in-influxdb-using-python-client
-        # #
-        #
-        # fields_iter = JsonObject.__get_fields(type(self))
-        # for field in fields_iter:
-        #     if not field.null and kwargs.get(field.name, None) is None:
-        #         raise ValueError("Null value passed for non-nullable field " + str(field.name))
-        #     field_names.append(field.name)
-        #
-        # if kwargs:
-        #     for prop in tuple(kwargs):
-        #         if prop in field_names:
-        #             _setattr(self, prop, kwargs[prop])
-        #             del kwargs[prop]
-        #
-        # if kwargs and accept_unknown:
-        #     raise TypeError("'%s' is an invalid keyword argument for this function" % list(kwargs)[0])
 
-        # def get_field_values_as_dict(self) -> Dict[str, Any]:
-        #     fields_dict = {}
-        #     type_dicts = type(self).__dict__
-        #     for n, field in type_dicts.items():
-        #         if isinstance(field, Field):
-        #             field_name = field.name
-        #             field_serialized_name = field.serialized_name
-        #             field_value = self.__getattribute__(field_name)
-        #             fields_dict[field_serialized_name] = field.get_json_formatted_value(field_value)
-        #     return fields_dict
-        #
-        # def get_child_values_as_dict(self) -> Dict[str, Any]:
-        #     child_dict = {}
-        #     type_dicts = type(self).__dict__
-        #     for n, child in type_dicts.items():
-        #         if isinstance(child, JsonObject):
-        #             field_name = child.serialized_name
-        #             field_serialized_name = child.serialized_name
-        #             field_value = self.__getattribute__(field_name)
-        #             child_dict[field_serialized_name] = field_value
-        #     return child_dict
-
-
+        
 T = TypeVar('T', bound=JsonObject)
 
 
@@ -467,67 +412,7 @@ class ObjectListField(Field):
         self.item_type = item_type
 
 
-# class TypeParser:
-#     def __init__(self, parent_type: Type[T]):
-#         self.parent_type = parent_type
-#
-#     def matches_type(self, instance) -> bool:
-#         return isinstance(instance, self.parent_type)
-#
-#     def matches_pattern(self, item_dict: dict) -> bool:
-#         raise NotImplementedError()
-#
-#     def get_type(self, item_dict: dict) -> Optional[Type]:
-#         raise NotImplementedError()
-#
-#
-# class FieldBasedTypeHierarchyParser(TypeParser):
-#     def __init__(self, parent_type: Type[T], field_name: str, field_value_type_map: Dict[Any, Type]):
-#         super().__init__(parent_type)
-#         self.field_name = field_name
-#         self.field_value_type_map = field_value_type_map
-#
-#     def matches_pattern(self, item_dict: dict) -> bool:
-#         return self.field_name in item_dict.keys()
-#
-#     def get_type(self, item_dict: dict) -> Optional[Type]:
-#         if self.field_name in item_dict.keys():
-#             return self.field_value_type_map.get(item_dict[self.field_name], None)
-#         return None
-#
-#
-# class KeyBasedTypeParser(TypeParser):
-#     def __init__(self, parent_type: Type[T], key_list_value_type_map: Dict[List[str], Type]):
-#         super().__init__(parent_type)
-#         self.key_list_value_type_map = key_list_value_type_map
-#
-#     def matches_pattern(self, item_dict: dict) -> bool:
-#         for key_set, t in self.key_list_value_type_map.items():
-#             includes = True
-#             for key in key_set:
-#                 if key not in item_dict.keys():
-#                     includes = False
-#             if includes:
-#                 return True
-#         return False
-#
-#     def get_type(self, item_dict: dict) -> Optional[Type]:
-#         for key_set, t in self.key_list_value_type_map.items():
-#             includes = True
-#             for key in key_set:
-#                 if key not in item_dict.keys():
-#                     includes = False
-#             if includes:
-#                 return t
-#         return None
-
-
 class Pykson:
-    # def __init__(self, sub_type_parsers: Optional[List[TypeParser]] = None):
-    #     self.sub_type_parsers = [] if sub_type_parsers is None else sub_type_parsers  # type: List[TypeParser]
-    #
-    # def add_type_parser(self, type_parser: TypeParser):
-    #     self.sub_type_parsers.append(type_parser)
 
     @staticmethod
     def __get_fields_mapped_by_names(cls) -> Dict[str, Field]:
@@ -601,19 +486,9 @@ class Pykson:
         return fields_dict
 
     # noinspection PyCallingNonCallable
-    # @staticmethod
-    # def from_json_dict(data: Dict, cls: Type[T], type_parsers: Optional[List[TypeParser]] = None, accept_unknown: bool = False) -> T:
     @staticmethod
     def _from_json_dict(data: Dict, cls: Type[T], accept_unknown: bool = False) -> T:
         sub_type = cls
-        # if type_parsers:
-        #     type_found = False
-        #     for parser in type_parsers:
-        #         if parser.matches_pattern(data):
-        #             if type_found:
-        #                 raise Exception('Duplicate applicable parsers for dict value passed for parsing')
-        #             sub_type = parser.get_type(data)
-        #             type_found = True
         children_mapped_by_serialized_names = Pykson.__get_children_mapped_by_serialized_names(sub_type)
         fields_mapped_by_serialized_names = Pykson.__get_fields_mapped_by_serialized_names(sub_type)
         field_names_mapped_by_serialized_names = Pykson.__get_field_names_mapped_by_serialized_names(sub_type)
@@ -655,7 +530,9 @@ class Pykson:
         if isinstance(data, dict):
             return Pykson._from_json_dict(data, cls, accept_unknown)
         elif isinstance(data, list):
-            return Pykson._from_json_list(data, cls, accept_unknown)
+            return Pykson.from_json_list(data, cls, accept_unknown)
+        elif isinstance(data, type(None)):
+            return None
         else:
             raise Exception('Unable to parse data')
 
