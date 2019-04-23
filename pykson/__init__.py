@@ -530,7 +530,7 @@ class Pykson:
         if isinstance(data, dict):
             return Pykson._from_json_dict(data, cls, accept_unknown)
         elif isinstance(data, list):
-            return Pykson.from_json_list(data, cls, accept_unknown)
+            return Pykson._from_json_list(data, cls, accept_unknown)
         elif isinstance(data, type(None)):
             return None
         else:
