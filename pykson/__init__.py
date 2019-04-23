@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Dict, Any, Tuple, List, Optional, TypeVar, Union, Type, Set
+from typing import Dict, Any, List, Optional, TypeVar, Union, Type, Set
 import six
 import pytz
 import json
@@ -117,6 +117,8 @@ class MultipleChoiceStringField(Field):
 
 class EnumStringField(Field):
     def __set__(self, instance, value):
+        if value is not None and value in self.enum_options:
+            value = value.value
         if value is not None and not isinstance(value, str):
             raise TypeError(instance, self.name, str, value)
         if value is not None and not (value in self.options):
@@ -137,7 +139,7 @@ class EnumStringField(Field):
         for option in options:
             if not isinstance(option, str):
                 raise Exception("Invalid value in enum string field, " + str(option) + ', expected str value but found ' + str(type(option)))
-        self.enum = enum
+        self.enum_options = [e for e in enum]
         self.options = set(options)
 
 
@@ -167,6 +169,8 @@ class MultipleChoiceIntegerField(Field):
 
 class EnumIntegerField(Field):
     def __set__(self, instance, value):
+        if value is not None and value in self.enum_options:
+            value = value.value
         if value is not None and not isinstance(value, int):
             raise TypeError(instance, self.name, int, value)
         if value is not None and not (value in self.options):
@@ -187,6 +191,7 @@ class EnumIntegerField(Field):
         for option in options:
             if not isinstance(option, int):
                 raise Exception("Invalid value in enum integer field, " + str(option) + ', expected int value but found ' + str(type(option)))
+        self.enum_options = [e for e in enum]
         self.options = set(options)
 
 
@@ -373,65 +378,10 @@ class JsonObjectMeta(type):
 class JsonObject(six.with_metaclass(JsonObjectMeta, JsonSerializable)):
     # noinspection PyUnusedLocal
     def __init__(self, accept_unknown: bool = False, *args, **kwargs):
+        # Empty init will be replaced by meta class
         super(JsonObject, self).__init__()
-        # field_names = []
-        # _setattr = setattr
-        #
-        # # Note: maybe ? save all timestamps as utc in database. Convert them to appropriate timezones when needed in python.
-        # #       By default, InfluxDB stores and returns timestamps in UTC.
-        # #
-        # # influx has timezones:
-        # # https://docs.influxdata.com/influxdb/v1.7/query_language/data_exploration/#the-time-zone-clause
-        # # I tested and it supports timezones. But there is something wrong with python client.
-        # # >>> If I give a datetime with timezone to python client, it still stores it in db with utc.
-        # #     the time is not wrong but it when u query that data point again,
-        # #     it does not give it with the timezone we gave it in first place.
-        # #
-        # #
-        # # I think it is better to save times in utc and then convert it on client side (python).
-        # # because when I insert a point from python influx client with timezone offset (+03:30 for example),
-        # # it gets saved in the database as a utc. see:
-        # # https://stackoverflow.com/questions/39736238/how-to-set-time-zone-in-influxdb-using-python-client
-        # #
-        #
-        # fields_iter = JsonObject.__get_fields(type(self))
-        # for field in fields_iter:
-        #     if not field.null and kwargs.get(field.name, None) is None:
-        #         raise ValueError("Null value passed for non-nullable field " + str(field.name))
-        #     field_names.append(field.name)
-        #
-        # if kwargs:
-        #     for prop in tuple(kwargs):
-        #         if prop in field_names:
-        #             _setattr(self, prop, kwargs[prop])
-        #             del kwargs[prop]
-        #
-        # if kwargs and accept_unknown:
-        #     raise TypeError("'%s' is an invalid keyword argument for this function" % list(kwargs)[0])
 
-        # def get_field_values_as_dict(self) -> Dict[str, Any]:
-        #     fields_dict = {}
-        #     type_dicts = type(self).__dict__
-        #     for n, field in type_dicts.items():
-        #         if isinstance(field, Field):
-        #             field_name = field.name
-        #             field_serialized_name = field.serialized_name
-        #             field_value = self.__getattribute__(field_name)
-        #             fields_dict[field_serialized_name] = field.get_json_formatted_value(field_value)
-        #     return fields_dict
-        #
-        # def get_child_values_as_dict(self) -> Dict[str, Any]:
-        #     child_dict = {}
-        #     type_dicts = type(self).__dict__
-        #     for n, child in type_dicts.items():
-        #         if isinstance(child, JsonObject):
-        #             field_name = child.serialized_name
-        #             field_serialized_name = child.serialized_name
-        #             field_value = self.__getattribute__(field_name)
-        #             child_dict[field_serialized_name] = field_value
-        #     return child_dict
-
-
+        
 T = TypeVar('T', bound=JsonObject)
 
 
@@ -463,6 +413,7 @@ class ObjectListField(Field):
 
 
 class Pykson:
+
     @staticmethod
     def __get_fields_mapped_by_names(cls) -> Dict[str, Field]:
         result_dict = {}
@@ -536,10 +487,11 @@ class Pykson:
 
     # noinspection PyCallingNonCallable
     @staticmethod
-    def from_json_dict(data: Dict, cls: Type[T], accept_unknown: bool = False) -> T:
-        children_mapped_by_serialized_names = Pykson.__get_children_mapped_by_serialized_names(cls)
-        fields_mapped_by_serialized_names = Pykson.__get_fields_mapped_by_serialized_names(cls)
-        field_names_mapped_by_serialized_names = Pykson.__get_field_names_mapped_by_serialized_names(cls)
+    def _from_json_dict(data: Dict, cls: Type[T], accept_unknown: bool = False) -> T:
+        sub_type = cls
+        children_mapped_by_serialized_names = Pykson.__get_children_mapped_by_serialized_names(sub_type)
+        fields_mapped_by_serialized_names = Pykson.__get_fields_mapped_by_serialized_names(sub_type)
+        field_names_mapped_by_serialized_names = Pykson.__get_field_names_mapped_by_serialized_names(sub_type)
         data_copy = {}
         for data_key, data_value in data.items():
             if isinstance(data_value, list) and (data_key in fields_mapped_by_serialized_names.keys()) and isinstance(fields_mapped_by_serialized_names[data_key], ObjectListField):
@@ -560,15 +512,15 @@ class Pykson:
                     data_copy[field_names_mapped_by_serialized_names[data_key]] = data_value
                 else:
                     data_copy[data_key] = data_value
-        return cls(accept_unknown=accept_unknown, **data_copy)
+        return sub_type(accept_unknown=accept_unknown, **data_copy)
 
     # noinspection PyCallingNonCallable
     @staticmethod
-    def from_json_list(data: List, cls: Type[T], accept_unknown: bool = False) -> List[T]:
+    def _from_json_list(data: List, cls: Type[T], accept_unknown: bool = False) -> List[T]:
         list_result = []  # type: List[T]
         for data_value_item in data:
             # noinspection PyUnresolvedReferences
-            list_result.append(Pykson.from_json_dict(data_value_item, cls, accept_unknown))
+            list_result.append(Pykson._from_json_dict(data_value_item, cls, accept_unknown))
         return list_result
 
     @staticmethod
@@ -576,7 +528,7 @@ class Pykson:
         if isinstance(data, str):
             data = json.loads(data)
         if isinstance(data, dict):
-            return Pykson.from_json_dict(data, cls, accept_unknown)
+            return Pykson._from_json_dict(data, cls, accept_unknown)
         elif isinstance(data, list):
             return Pykson.from_json_list(data, cls, accept_unknown)
         elif isinstance(data, type(None)):
@@ -590,12 +542,12 @@ class Pykson:
         final_dict = {}
         for field_key, field_value in fields_dict.items():
             if isinstance(field_value, JsonObject):
-                final_dict[field_key] = Pykson.to_json(field_value)
+                final_dict[field_key] = Pykson._to_json(field_value)
             elif isinstance(field_value, list):
                 list_value = []
                 for item in field_value:
                     if isinstance(item, JsonObject):
-                        list_value.append(Pykson.to_json(item))
+                        list_value.append(Pykson._to_json(item))
                     else:
                         list_value.append(item)
                 final_dict[field_key] = list_value
@@ -604,26 +556,31 @@ class Pykson:
         return final_dict
 
     @staticmethod
-    def to_json(item: Union[T, List[T]]) -> str:
+    def _to_json(item: T) -> Union[Dict[str, Any], List[Dict[str, Any]]]:
         if isinstance(item, list):
             final_list = []
             for i in item:
                 final_list.append(Pykson.__item_to_dict(i))
-            return json.dumps(final_list)
+            return final_list
         else:
             fields_dict = Pykson.__get_field_and_child_values_as_dict(item)
             final_dict = {}
             for field_key, field_value in fields_dict.items():
                 if isinstance(field_value, JsonObject):
-                    final_dict[field_key] = Pykson.to_json(field_value)
+                    final_dict[field_key] = Pykson._to_json(field_value)
                 elif isinstance(field_value, list):
                     list_value = []
                     for item in field_value:
                         if isinstance(item, JsonObject):
-                            list_value.append(Pykson.to_json(item))
+                            list_value.append(Pykson._to_json(item))
                         else:
                             list_value.append(item)
                     final_dict[field_key] = list_value
                 else:
                     final_dict[field_key] = field_value
-            return json.dumps(final_dict)
+            return final_dict
+
+    @staticmethod
+    def to_json(item: Union[T, List[T]]) -> str:
+        return json.dumps(Pykson._to_json(item))
+
