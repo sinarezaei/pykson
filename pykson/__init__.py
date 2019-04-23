@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Dict, Any, Tuple, List, Optional, TypeVar, Union, Type, Set
+from typing import Dict, Any, List, Optional, TypeVar, Union, Type, Set
 import six
 import pytz
 import json
@@ -117,6 +117,8 @@ class MultipleChoiceStringField(Field):
 
 class EnumStringField(Field):
     def __set__(self, instance, value):
+        if value is not None and value in self.enum_options:
+            value = value.value
         if value is not None and not isinstance(value, str):
             raise TypeError(instance, self.name, str, value)
         if value is not None and not (value in self.options):
@@ -137,7 +139,7 @@ class EnumStringField(Field):
         for option in options:
             if not isinstance(option, str):
                 raise Exception("Invalid value in enum string field, " + str(option) + ', expected str value but found ' + str(type(option)))
-        self.enum = enum
+        self.enum_options = [e for e in enum]
         self.options = set(options)
 
 
@@ -167,6 +169,8 @@ class MultipleChoiceIntegerField(Field):
 
 class EnumIntegerField(Field):
     def __set__(self, instance, value):
+        if value is not None and value in self.enum_options:
+            value = value.value
         if value is not None and not isinstance(value, int):
             raise TypeError(instance, self.name, int, value)
         if value is not None and not (value in self.options):
@@ -187,6 +191,7 @@ class EnumIntegerField(Field):
         for option in options:
             if not isinstance(option, int):
                 raise Exception("Invalid value in enum integer field, " + str(option) + ', expected int value but found ' + str(type(option)))
+        self.enum_options = [e for e in enum]
         self.options = set(options)
 
 
@@ -462,7 +467,68 @@ class ObjectListField(Field):
         self.item_type = item_type
 
 
+# class TypeParser:
+#     def __init__(self, parent_type: Type[T]):
+#         self.parent_type = parent_type
+#
+#     def matches_type(self, instance) -> bool:
+#         return isinstance(instance, self.parent_type)
+#
+#     def matches_pattern(self, item_dict: dict) -> bool:
+#         raise NotImplementedError()
+#
+#     def get_type(self, item_dict: dict) -> Optional[Type]:
+#         raise NotImplementedError()
+#
+#
+# class FieldBasedTypeHierarchyParser(TypeParser):
+#     def __init__(self, parent_type: Type[T], field_name: str, field_value_type_map: Dict[Any, Type]):
+#         super().__init__(parent_type)
+#         self.field_name = field_name
+#         self.field_value_type_map = field_value_type_map
+#
+#     def matches_pattern(self, item_dict: dict) -> bool:
+#         return self.field_name in item_dict.keys()
+#
+#     def get_type(self, item_dict: dict) -> Optional[Type]:
+#         if self.field_name in item_dict.keys():
+#             return self.field_value_type_map.get(item_dict[self.field_name], None)
+#         return None
+#
+#
+# class KeyBasedTypeParser(TypeParser):
+#     def __init__(self, parent_type: Type[T], key_list_value_type_map: Dict[List[str], Type]):
+#         super().__init__(parent_type)
+#         self.key_list_value_type_map = key_list_value_type_map
+#
+#     def matches_pattern(self, item_dict: dict) -> bool:
+#         for key_set, t in self.key_list_value_type_map.items():
+#             includes = True
+#             for key in key_set:
+#                 if key not in item_dict.keys():
+#                     includes = False
+#             if includes:
+#                 return True
+#         return False
+#
+#     def get_type(self, item_dict: dict) -> Optional[Type]:
+#         for key_set, t in self.key_list_value_type_map.items():
+#             includes = True
+#             for key in key_set:
+#                 if key not in item_dict.keys():
+#                     includes = False
+#             if includes:
+#                 return t
+#         return None
+
+
 class Pykson:
+    # def __init__(self, sub_type_parsers: Optional[List[TypeParser]] = None):
+    #     self.sub_type_parsers = [] if sub_type_parsers is None else sub_type_parsers  # type: List[TypeParser]
+    #
+    # def add_type_parser(self, type_parser: TypeParser):
+    #     self.sub_type_parsers.append(type_parser)
+
     @staticmethod
     def __get_fields_mapped_by_names(cls) -> Dict[str, Field]:
         result_dict = {}
@@ -535,11 +601,22 @@ class Pykson:
         return fields_dict
 
     # noinspection PyCallingNonCallable
+    # @staticmethod
+    # def from_json_dict(data: Dict, cls: Type[T], type_parsers: Optional[List[TypeParser]] = None, accept_unknown: bool = False) -> T:
     @staticmethod
-    def from_json_dict(data: Dict, cls: Type[T], accept_unknown: bool = False) -> T:
-        children_mapped_by_serialized_names = Pykson.__get_children_mapped_by_serialized_names(cls)
-        fields_mapped_by_serialized_names = Pykson.__get_fields_mapped_by_serialized_names(cls)
-        field_names_mapped_by_serialized_names = Pykson.__get_field_names_mapped_by_serialized_names(cls)
+    def _from_json_dict(data: Dict, cls: Type[T], accept_unknown: bool = False) -> T:
+        sub_type = cls
+        # if type_parsers:
+        #     type_found = False
+        #     for parser in type_parsers:
+        #         if parser.matches_pattern(data):
+        #             if type_found:
+        #                 raise Exception('Duplicate applicable parsers for dict value passed for parsing')
+        #             sub_type = parser.get_type(data)
+        #             type_found = True
+        children_mapped_by_serialized_names = Pykson.__get_children_mapped_by_serialized_names(sub_type)
+        fields_mapped_by_serialized_names = Pykson.__get_fields_mapped_by_serialized_names(sub_type)
+        field_names_mapped_by_serialized_names = Pykson.__get_field_names_mapped_by_serialized_names(sub_type)
         data_copy = {}
         for data_key, data_value in data.items():
             if isinstance(data_value, list) and (data_key in fields_mapped_by_serialized_names.keys()) and isinstance(fields_mapped_by_serialized_names[data_key], ObjectListField):
@@ -560,15 +637,15 @@ class Pykson:
                     data_copy[field_names_mapped_by_serialized_names[data_key]] = data_value
                 else:
                     data_copy[data_key] = data_value
-        return cls(accept_unknown=accept_unknown, **data_copy)
+        return sub_type(accept_unknown=accept_unknown, **data_copy)
 
     # noinspection PyCallingNonCallable
     @staticmethod
-    def from_json_list(data: List, cls: Type[T], accept_unknown: bool = False) -> List[T]:
+    def _from_json_list(data: List, cls: Type[T], accept_unknown: bool = False) -> List[T]:
         list_result = []  # type: List[T]
         for data_value_item in data:
             # noinspection PyUnresolvedReferences
-            list_result.append(Pykson.from_json_dict(data_value_item, cls, accept_unknown))
+            list_result.append(Pykson._from_json_dict(data_value_item, cls, accept_unknown))
         return list_result
 
     @staticmethod
@@ -576,9 +653,9 @@ class Pykson:
         if isinstance(data, str):
             data = json.loads(data)
         if isinstance(data, dict):
-            return Pykson.from_json_dict(data, cls, accept_unknown)
+            return Pykson._from_json_dict(data, cls, accept_unknown)
         elif isinstance(data, list):
-            return Pykson.from_json_list(data, cls, accept_unknown)
+            return Pykson._from_json_list(data, cls, accept_unknown)
         else:
             raise Exception('Unable to parse data')
 
@@ -588,12 +665,12 @@ class Pykson:
         final_dict = {}
         for field_key, field_value in fields_dict.items():
             if isinstance(field_value, JsonObject):
-                final_dict[field_key] = Pykson.to_json(field_value)
+                final_dict[field_key] = Pykson._to_json(field_value)
             elif isinstance(field_value, list):
                 list_value = []
                 for item in field_value:
                     if isinstance(item, JsonObject):
-                        list_value.append(Pykson.to_json(item))
+                        list_value.append(Pykson._to_json(item))
                     else:
                         list_value.append(item)
                 final_dict[field_key] = list_value
@@ -602,26 +679,31 @@ class Pykson:
         return final_dict
 
     @staticmethod
-    def to_json(item: Union[T, List[T]]) -> str:
+    def _to_json(item: T) -> Union[Dict[str, Any], List[Dict[str, Any]]]:
         if isinstance(item, list):
             final_list = []
             for i in item:
                 final_list.append(Pykson.__item_to_dict(i))
-            return json.dumps(final_list)
+            return final_list
         else:
             fields_dict = Pykson.__get_field_and_child_values_as_dict(item)
             final_dict = {}
             for field_key, field_value in fields_dict.items():
                 if isinstance(field_value, JsonObject):
-                    final_dict[field_key] = Pykson.to_json(field_value)
+                    final_dict[field_key] = Pykson._to_json(field_value)
                 elif isinstance(field_value, list):
                     list_value = []
                     for item in field_value:
                         if isinstance(item, JsonObject):
-                            list_value.append(Pykson.to_json(item))
+                            list_value.append(Pykson._to_json(item))
                         else:
                             list_value.append(item)
                     final_dict[field_key] = list_value
                 else:
                     final_dict[field_key] = field_value
-            return json.dumps(final_dict)
+            return final_dict
+
+    @staticmethod
+    def to_json(item: Union[T, List[T]]) -> str:
+        return json.dumps(Pykson._to_json(item))
+
