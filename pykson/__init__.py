@@ -407,8 +407,10 @@ class ObjectField(Field):
         self.item_type = item_type
 
 
-# noinspection PyAbstractClass
 class ObjectListField(Field, Sized):
+
+    def __len__(self) -> int:
+        raise Exception("Must use len on instance value not on field")
 
     def __set__(self, instance, value):
         if value is not None and not isinstance(value, list):
