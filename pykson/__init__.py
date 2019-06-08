@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Dict, Any, List, Optional, TypeVar, Union, Type, Set
+from typing import Dict, Any, List, Optional, TypeVar, Union, Type, Set, Sized
 import six
 import pytz
 import json
@@ -21,6 +21,7 @@ class FieldType(Enum):
     DATE = 6
     TIME = 7
     DATETIME = 8
+    DICT = 9
 
 
 class Field(JsonSerializable):
@@ -293,6 +294,16 @@ class TimestampMillisecondsField(Field):
         self.datetime_timezone = datetime_timezone
 
 
+class JsonField(Field):
+    def __set__(self, instance, value):
+        if value is not None and not isinstance(value, dict):
+            raise TypeError(instance, self.name, dict, value)
+        super().__set__(instance, value)
+
+    def __init__(self, serialized_name: Optional[str] = None, null: bool = True):
+        super(JsonField, self).__init__(field_type=FieldType.DICT, serialized_name=serialized_name, null=null)
+
+
 F = TypeVar('F', bound=Field)
 
 
@@ -396,7 +407,9 @@ class ObjectField(Field):
         self.item_type = item_type
 
 
-class ObjectListField(Field):
+# noinspection PyAbstractClass
+class ObjectListField(Field, Sized):
+
     def __set__(self, instance, value):
         if value is not None and not isinstance(value, list):
             raise TypeError(instance, self.name, list, value)
@@ -545,12 +558,14 @@ class Pykson:
                 final_dict[field_key] = Pykson._to_json(field_value)
             elif isinstance(field_value, list):
                 list_value = []
-                for item in field_value:
-                    if isinstance(item, JsonObject):
-                        list_value.append(Pykson._to_json(item))
+                for sub_item in field_value:
+                    if isinstance(sub_item, JsonObject):
+                        list_value.append(Pykson._to_json(sub_item))
                     else:
-                        list_value.append(item)
+                        list_value.append(sub_item)
                 final_dict[field_key] = list_value
+            elif isinstance(field_value, dict):
+                final_dict[field_key] = field_value
             else:
                 final_dict[field_key] = field_value
         return final_dict
@@ -576,6 +591,8 @@ class Pykson:
                         else:
                             list_value.append(item)
                     final_dict[field_key] = list_value
+                elif isinstance(field_value, dict):
+                    final_dict[field_key] = field_value
                 else:
                     final_dict[field_key] = field_value
             return final_dict
