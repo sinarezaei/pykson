@@ -474,6 +474,15 @@ class Pykson:
         return fields_list
 
     @staticmethod
+    def get_field_names(cls: Type[T]) -> List[str]:
+        fields_nams = []
+        type_dicts = cls.__dict__  # type(self).__dict__
+        for n, field in type_dicts.items():
+            if isinstance(field, Field):
+                fields_nams.append(field.serialized_name)
+        return fields_nams
+
+    @staticmethod
     def __get_child_objects(cls) -> List[JsonObject]:
         child_list = []
         type_dicts = cls.__dict__  # type(self).__dict__
