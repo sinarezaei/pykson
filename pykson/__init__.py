@@ -424,7 +424,6 @@ class ObjectListField(Field, List[T], Generic[T]):
 
     def __init__(self, item_type: Type[T], serialized_name: Optional[str] = None, null: bool = True):
         super(ObjectListField, self).__init__(field_type=FieldType.LIST, serialized_name=serialized_name, null=null)
-        super(List[T], self).__init__()
         self.item_type = item_type
 
 
