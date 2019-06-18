@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Dict, Any, List, Optional, TypeVar, Union, Type, Set, Sized
+from typing import Dict, Any, List, Optional, TypeVar, Union, Type, Set, Sized, Generic
 import six
 import pytz
 import json
@@ -407,7 +407,7 @@ class ObjectField(Field):
         self.item_type = item_type
 
 
-class ObjectListField(Field, Sized):
+class ObjectListField(Field, List[T], Generic[T]):
 
     def __len__(self) -> int:
         raise Exception("Must use len on instance value not on field")
@@ -420,10 +420,11 @@ class ObjectListField(Field, Sized):
         for item in value:
             assert item is not None, "Null item passed to ObjectListField"
             assert isinstance(item, self.item_type), "ObjectListField items must be of " + str(self.item_type) + ", found " + str(type(item))
-        super().__set__(instance, value)
+        super(ObjectListField, self).__set__(instance, value)
 
     def __init__(self, item_type: Type[T], serialized_name: Optional[str] = None, null: bool = True):
         super(ObjectListField, self).__init__(field_type=FieldType.LIST, serialized_name=serialized_name, null=null)
+        super(List[T], self).__init__()
         self.item_type = item_type
 
 
