@@ -243,7 +243,7 @@ class DateTimeField(Field):
     def __set__(self, instance, value):
         if value is not None and isinstance(value, str):
             try:
-                value = datetime.datetime.strptime(value, self.datetime_format).astimezone(pytz.timezone(self.datetime_timezone))
+                value = pytz.timezone(self.datetime_timezone).localize(datetime.datetime.strptime(value, self.datetime_format))
             except:
                 raise Exception('Error parsing date ' + str(value) + ' with given format ' + str(self.datetime_format))
         if value is not None and not isinstance(value, datetime.datetime):
@@ -263,7 +263,7 @@ class TimestampSecondsField(Field):
     def __set__(self, instance, value):
         if value is not None and isinstance(value, int):
             try:
-                value = datetime.datetime.fromtimestamp(float(value)).astimezone(pytz.timezone(self.datetime_timezone))
+                value = pytz.timezone(self.datetime_timezone).localize(datetime.datetime.fromtimestamp(float(value)))
             except:
                 raise Exception('Error parsing timestamp (in seconds) ' + str(value))
         if value is not None and not isinstance(value, datetime.datetime):
@@ -282,7 +282,7 @@ class TimestampMillisecondsField(Field):
     def __set__(self, instance, value):
         if value is not None and isinstance(value, int):
             try:
-                value = datetime.datetime.fromtimestamp(float(value / 1000.0)).astimezone(pytz.timezone(self.datetime_timezone))
+                value = pytz.timezone(self.datetime_timezone).localize(datetime.datetime.fromtimestamp(float(value / 1000.0)))
             except:
                 raise Exception('Error parsing timestamp (in milliseconds) ' + str(value))
         if value is not None and not isinstance(value, datetime.datetime):
