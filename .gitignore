@@ -4,6 +4,7 @@
 __pycache__/
 setup.py
 */sample.py
+/.eggs
 
 # Compiled python modules.
 *.pyc

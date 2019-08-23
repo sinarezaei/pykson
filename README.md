@@ -44,13 +44,13 @@ Use `Pykson` class to deserialize json string to `JsonObject`s
 from pykson import Pykson
 
 json_text = '{"first_name":"John", "last_name":"Smith", "age": 25, "scores": [ {"course": {"name": "Algebra", "teacher" :"Mr. Schmidt"}, "score": 100}, {"course": {"name": "Statistics", "teacher": "Mrs. Lee"}, "score": 90} ]}'
-student = Pykson.from_json(json_text, Student)
+student = Pykson().from_json(json_text, Student)
 ```
 
 ### Serialize objects
 Use `Pykson` class to serialize `JsonObject`s to string
 ```python
-Pykson.to_json(student)
+Pykson().to_json(student)
 ```
 ## Fields
 There are different types of predefined fields: `IntegerField`, `FloatField`, `BooleanField`, `StringField`, `ListField`, `ObjectField`, `ObjectListField`, `DateField`, `TimeField`, `DateTimeField`, `TimestampSecondsField` and `TimestampMillisecondsField`.
@@ -105,7 +105,7 @@ class Student(JsonObject):
 
 
 json_text = '{"fn":"John", "ln":"Smith", "a": 25, "s": {"s": 100, "c":"Algebra"}}'
-student = Pykson.from_json(json_text, Student)
+student = Pykson().from_json(json_text, Student)
 ```
 
 ### Work with dates and datetimes
@@ -118,8 +118,50 @@ Three of them, `DateField`, `TimeField` and `DateTimeField`, use date/time forma
 
 ```python
 json_text = '{"fn":"John", "ln":"Smith", "a": 25, "up":"some unknown parameter", "s": {"s": 100, "c":"Algebra"}}'
-student = Pykson.from_json(json_text, Student, accept_unknown=True)
+student = Pykson().from_json(json_text, Student, accept_unknown=True)
 ```
+
+
+### Type hierarchy adapter
+You can register multiple type hierarchy adapters using register_type_hierarchy_adapter method of 'Pykson' class.
+```python
+from pykson import TypeHierarchyAdapter
+
+class Student(JsonObject):
+    name = StringField(serialized_name="n")
+
+
+class HighSchoolStudent(Student):
+    high_school_name = StringField(serialized_name="sn")
+
+
+class UniversityStudent(Student):
+    university_name = StringField(serialized_name="un")
+
+
+students = [
+    HighSchoolStudent(name="john", high_school_name="Redstone High"),
+    UniversityStudent(name="alice", university_name="Green Institute of Tech.")
+]
+
+pson = Pykson()
+pson.register_type_hierarchy_adapter(
+    Student,
+    "student_type",
+    {
+        "highschool": HighSchoolStudent,
+        "university": UniversityStudent
+    }
+)
+
+students_json = pson.to_json(students)
+
+decoded_students = pson.from_json(students_json, Student)
+
+assert decoded_students == students
+```
+
+
 
 [pypi_version]: https://img.shields.io/pypi/v/pykson.svg "PYPI version"
 [licence_version]: https://img.shields.io/badge/license-MIT%20v2-brightgreen.svg "MIT Licence"

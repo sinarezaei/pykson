@@ -5,7 +5,7 @@ import pytz
 import json
 import datetime
 
-name = "pykson"
+# name = "pykson"
 
 
 class JsonSerializable:
@@ -326,7 +326,15 @@ class ListField(Field):
 
 
 class JsonObjectMeta(type):
-    # noinspection PyInitNewSignature,PyUnresolvedReferences,PyTypeChecker,SpellCheckingInspection,PyMethodParameters,PyShadowingNames
+    @staticmethod
+    def __get_class_hierarchy_field_names(cls) -> List[str]:
+        tmp_class_dict = cls.__dict__
+        model_field_names = [k for k in tmp_class_dict.keys() if (isinstance(tmp_class_dict.get(k), JsonSerializable))]  # type: List[str]
+        for base in cls.__bases__:
+            if issubclass(base, JsonSerializable):
+                model_field_names.extend(JsonObjectMeta.__get_class_hierarchy_field_names(base))
+        return model_field_names
+
     def __new__(cls, name, bases, attrs: Dict[str, Any]):
         m_module = attrs.pop('__module__')
         new_attrs = {'__module__': m_module}
@@ -363,20 +371,22 @@ class JsonObjectMeta(type):
                 setattr(new_class, field_name, field)
 
         # noinspection PyUnusedLocal
-        def my_custom_init(instance_self, accept_unknown: bool = False, *init_args, **init_kwargs):
+        def my_custom_init(instance_self, accept_unknown: bool = False, extra_attributes: Optional[List[str]] = None, *init_args, **init_kwargs):
             instance_self._data = {}  # dict.fromkeys(attrs.keys())
-            tmp_class_dict = instance_self.__class__.__dict__
             _setattr = setattr
 
             _setattr(instance_self, 'serialized_name', None)
 
-            model_field_names = [k for k in tmp_class_dict.keys() if (isinstance(tmp_class_dict.get(k), JsonSerializable))]
+            model_field_names = JsonObjectMeta.__get_class_hierarchy_field_names(instance_self.__class__)
+
             for field_key in model_field_names:
                 if field_key not in init_kwargs.keys():
                     _setattr(instance_self, field_key, None)
 
             for key, value in init_kwargs.items():
                 if key in model_field_names:
+                    _setattr(instance_self, key, value)
+                elif extra_attributes is not None and key in extra_attributes:
                     _setattr(instance_self, key, value)
                 elif not accept_unknown:
                     raise Exception("value given in instance initialization but was not defined in model as Field. key:" + str(key) +
@@ -388,7 +398,7 @@ class JsonObjectMeta(type):
 
 class JsonObject(six.with_metaclass(JsonObjectMeta, JsonSerializable)):
     # noinspection PyUnusedLocal
-    def __init__(self, accept_unknown: bool = False, *args, **kwargs):
+    def __init__(self, accept_unknown: bool = False, extra_attributes: Optional[List[str]] = None, *args, **kwargs):
         # Empty init will be replaced by meta class
         super(JsonObject, self).__init__()
 
@@ -425,6 +435,17 @@ class ObjectListField(Field, List[T], Generic[T]):
     def __init__(self, item_type: Type[T], serialized_name: Optional[str] = None, null: bool = True):
         super(ObjectListField, self).__init__(field_type=FieldType.LIST, serialized_name=serialized_name, null=null)
         self.item_type = item_type
+
+
+class TypeHierarchyAdapter:
+
+    def __init__(self,
+                 base_class: Type[T],
+                 type_key: str,
+                 subtype_key_values: Dict[str, Type[T]]):
+        self.base_class = base_class
+        self.type_key = type_key
+        self.subtype_key_values = subtype_key_values
 
 
 class Pykson:
@@ -471,16 +492,21 @@ class Pykson:
         for n, field in type_dicts.items():
             if isinstance(field, Field):
                 fields_list.append(field)
+        for base in cls.__bases__:
+            base_type_dicts = base.__dict__  # type(self).__dict__
+            for n, field in base_type_dicts.items():
+                if isinstance(field, Field):
+                    fields_list.append(field)
         return fields_list
 
-    @staticmethod
-    def get_field_names(cls: Type[T]) -> List[str]:
-        fields_nams = []
-        type_dicts = cls.__dict__  # type(self).__dict__
-        for n, field in type_dicts.items():
-            if isinstance(field, Field):
-                fields_nams.append(field.serialized_name)
-        return fields_nams
+    # @staticmethod
+    # def get_field_names(cls: Type[T]) -> List[str]:
+    #     fields_nams = []
+    #     type_dicts = cls.__dict__  # type(self).__dict__
+    #     for n, field in type_dicts.items():
+    #         if isinstance(field, Field):
+    #             fields_nams.append(field.serialized_name)
+    #     return fields_nams
 
     @staticmethod
     def __get_child_objects(cls) -> List[JsonObject]:
@@ -489,6 +515,11 @@ class Pykson:
         for n, child in type_dicts.items():
             if isinstance(child, JsonObject):
                 child_list.append(child)
+        for base in cls.__bases__:
+            base_type_dicts = base.__dict__  # type(self).__dict__
+            for n, child in base_type_dicts.items():
+                if isinstance(child, JsonObject):
+                    child_list.append(child)
         return child_list
 
     @staticmethod
@@ -506,101 +537,143 @@ class Pykson:
                 field_serialized_name = n
                 field_value = json_object.__getattribute__(field_name)
                 fields_dict[field_serialized_name] = field_value
+        for base in type(json_object).__bases__:
+            type_dicts = base.__dict__
+            for n, field in type_dicts.items():
+                if isinstance(field, Field):
+                    field_name = field.name
+                    field_serialized_name = field.serialized_name
+                    field_value = json_object.__getattribute__(field_name)
+                    fields_dict[field_serialized_name] = field.get_json_formatted_value(field_value)
+                elif isinstance(field, JsonObject):
+                    field_name = n
+                    field_serialized_name = n
+                    field_value = json_object.__getattribute__(field_name)
+                    fields_dict[field_serialized_name] = field_value
+
         return fields_dict
 
+    def __init__(self):
+        self.type_hierarchy_adapters = []  # type: List[TypeHierarchyAdapter]
+
+    def register_type_hierarchy_adapter(self, type_hierarchy_adapter: TypeHierarchyAdapter):
+        self.type_hierarchy_adapters.append(type_hierarchy_adapter)
+
     # noinspection PyCallingNonCallable
-    @staticmethod
-    def _from_json_dict(data: Dict, cls: Type[T], accept_unknown: bool = False) -> T:
+    def _from_json_dict(self, data: Dict, cls: Type[T], accept_unknown: bool = False) -> T:
         sub_type = cls
+        extra_attributes = []  # type: List[str]
+
+        for type_hierarchy_adapter in self.type_hierarchy_adapters:
+            if type_hierarchy_adapter.base_class == cls:
+                subtype_key = data.get(type_hierarchy_adapter.type_key, None)
+                if subtype_key is None:
+                    raise Exception('No sub-type key provided in class of type ' + str(cls) + ' for type key ' + str(type_hierarchy_adapter.type_key))
+                sub_type = type_hierarchy_adapter.subtype_key_values.get(subtype_key, None)
+                if sub_type is None:
+                    raise Exception('No sub-type provided in type hierarchy adapter for base class of ' + str(cls) + ' for sub-type key ' + str(subtype_key))
+                extra_attributes.append(type_hierarchy_adapter.type_key)
+
         children_mapped_by_serialized_names = Pykson.__get_children_mapped_by_serialized_names(sub_type)
         fields_mapped_by_serialized_names = Pykson.__get_fields_mapped_by_serialized_names(sub_type)
         field_names_mapped_by_serialized_names = Pykson.__get_field_names_mapped_by_serialized_names(sub_type)
         data_copy = {}
         for data_key, data_value in data.items():
-            if isinstance(data_value, list) and (data_key in fields_mapped_by_serialized_names.keys()) and isinstance(fields_mapped_by_serialized_names[data_key], ObjectListField):
+            if isinstance(data_value, list) and (data_key in fields_mapped_by_serialized_names.keys()) and isinstance(fields_mapped_by_serialized_names[data_key],
+                                                                                                                      ObjectListField):
                 data_list_value = []
                 for data_value_item in data_value:
                     # noinspection PyUnresolvedReferences
                     data_list_value.append(
-                        Pykson.from_json(data_value_item, fields_mapped_by_serialized_names[data_key].item_type, accept_unknown=accept_unknown)
+                        self.from_json(data_value_item, fields_mapped_by_serialized_names[data_key].item_type, accept_unknown=accept_unknown)
                     )
                 data_copy[field_names_mapped_by_serialized_names[data_key]] = data_list_value
             elif data_key in children_mapped_by_serialized_names.keys() and isinstance(data_value, dict):
-                data_copy[data_key] = Pykson.from_json(data_value, type(children_mapped_by_serialized_names[data_key]), accept_unknown=accept_unknown)
+                data_copy[data_key] = self.from_json(data_value, type(children_mapped_by_serialized_names[data_key]), accept_unknown=accept_unknown)
             elif data_key in fields_mapped_by_serialized_names.keys() and isinstance(fields_mapped_by_serialized_names[data_key], ObjectField):
                 # noinspection PyUnresolvedReferences
-                data_copy[field_names_mapped_by_serialized_names[data_key]] = Pykson.from_json(data_value, fields_mapped_by_serialized_names[data_key].item_type,
-                                                                                               accept_unknown=accept_unknown)
+                data_copy[field_names_mapped_by_serialized_names[data_key]] = self.from_json(data_value, fields_mapped_by_serialized_names[data_key].item_type,
+                                                                                             accept_unknown=accept_unknown)
             else:
                 if data_key in field_names_mapped_by_serialized_names.keys():
                     data_copy[field_names_mapped_by_serialized_names[data_key]] = data_value
                 else:
                     data_copy[data_key] = data_value
-        return sub_type(accept_unknown=accept_unknown, **data_copy)
+        return sub_type(accept_unknown=accept_unknown, extra_attributes=extra_attributes, **data_copy)
 
     # noinspection PyCallingNonCallable
-    @staticmethod
-    def _from_json_list(data: List, cls: Type[T], accept_unknown: bool = False) -> List[T]:
+    def _from_json_list(self, data: List, cls: Type[T], accept_unknown: bool = False) -> List[T]:
         list_result = []  # type: List[T]
         for data_value_item in data:
             # noinspection PyUnresolvedReferences
-            list_result.append(Pykson._from_json_dict(data_value_item, cls, accept_unknown))
+            list_result.append(self.from_json(data_value_item, cls, accept_unknown))
         return list_result
 
-    @staticmethod
-    def from_json(data: Union[str, Dict, List], cls: Type[T], accept_unknown: bool = False) -> Union[T, List[T]]:
+    def from_json(self, data: Union[str, Dict, List], cls: Type[T], accept_unknown: bool = False) -> Optional[Union[T, List[T]]]:
         if isinstance(data, str):
             data = json.loads(data)
         if isinstance(data, dict):
-            return Pykson._from_json_dict(data, cls, accept_unknown)
+            return self._from_json_dict(data, cls, accept_unknown)
         elif isinstance(data, list):
-            return Pykson._from_json_list(data, cls, accept_unknown)
+            return self._from_json_list(data, cls, accept_unknown)
         elif isinstance(data, type(None)):
             return None
         else:
-            raise Exception('Unable to parse data')
+            raise Exception('Unable to parse data of type ' + str(type(data)))
 
-    @staticmethod
-    def __item_to_dict(item: T) -> Dict[str, Any]:
-        fields_dict = Pykson.__get_field_and_child_values_as_dict(item)
-        final_dict = {}
-        for field_key, field_value in fields_dict.items():
-            if isinstance(field_value, JsonObject):
-                final_dict[field_key] = Pykson._to_json(field_value)
-            elif isinstance(field_value, list):
-                list_value = []
-                for sub_item in field_value:
-                    if isinstance(sub_item, JsonObject):
-                        list_value.append(Pykson._to_json(sub_item))
-                    else:
-                        list_value.append(sub_item)
-                final_dict[field_key] = list_value
-            elif isinstance(field_value, dict):
-                final_dict[field_key] = field_value
-            else:
-                final_dict[field_key] = field_value
-        return final_dict
+    # def __item_to_dict(self, item: T) -> Dict[str, Any]:
+    #     fields_dict = Pykson.__get_field_and_child_values_as_dict(item)
+    #     final_dict = {}
+    #     for field_key, field_value in fields_dict.items():
+    #         if isinstance(field_value, JsonObject):
+    #             final_dict[field_key] = self._to_json(field_value)
+    #         elif isinstance(field_value, list):
+    #             list_value = []
+    #             for sub_item in field_value:
+    #                 if isinstance(sub_item, JsonObject):
+    #                     list_value.append(self._to_json(sub_item))
+    #                 else:
+    #                     list_value.append(sub_item)
+    #             final_dict[field_key] = list_value
+    #         elif isinstance(field_value, dict):
+    #             final_dict[field_key] = field_value
+    #         else:
+    #             final_dict[field_key] = field_value
+    #     return final_dict
 
-    @staticmethod
-    def _to_json(item: T) -> Union[Dict[str, Any], List[Dict[str, Any]]]:
+    def _to_json(self, item: Union[T, List[T]]) -> Union[Dict[str, Any], List[Dict[str, Any]]]:
         if isinstance(item, list):
             final_list = []
             for i in item:
-                final_list.append(Pykson.__item_to_dict(i))
+                final_list.append(self._to_json(i))
             return final_list
         else:
             fields_dict = Pykson.__get_field_and_child_values_as_dict(item)
             final_dict = {}
+            # check if item type exists in type hierarchi adapters
+            for type_hierarchy_adapter in self.type_hierarchy_adapters:
+                if isinstance(item, type_hierarchy_adapter.base_class):
+                    # find type from dictionary
+                    type_found = False
+                    for subtype_key, subtype_class in type_hierarchy_adapter.subtype_key_values.items():
+                        if isinstance(item, subtype_class):
+                            type_found = True
+                            final_dict[type_hierarchy_adapter.type_key] = subtype_key
+                            break
+                    if not type_found:
+                        raise Exception('No sub-type key was entered for item of type ' + str(type(item)) + ' in type hierarchy of base type ' +
+                                        str(type_hierarchy_adapter.base_class))
+
             for field_key, field_value in fields_dict.items():
                 if isinstance(field_value, JsonObject):
-                    final_dict[field_key] = Pykson._to_json(field_value)
+                    final_dict[field_key] = self._to_json(field_value)
                 elif isinstance(field_value, list):
                     list_value = []
-                    for item in field_value:
-                        if isinstance(item, JsonObject):
-                            list_value.append(Pykson._to_json(item))
+                    for val in field_value:
+                        if isinstance(val, JsonObject):
+                            list_value.append(self._to_json(val))
                         else:
-                            list_value.append(item)
+                            list_value.append(val)
                     final_dict[field_key] = list_value
                 elif isinstance(field_value, dict):
                     final_dict[field_key] = field_value
@@ -608,6 +681,5 @@ class Pykson:
                     final_dict[field_key] = field_value
             return final_dict
 
-    @staticmethod
-    def to_json(item: Union[T, List[T]]) -> str:
-        return json.dumps(Pykson._to_json(item))
+    def to_json(self, item: Union[T, List[T]]) -> str:
+        return json.dumps(self._to_json(item))
