@@ -243,7 +243,8 @@ class DateTimeField(Field):
     def __set__(self, instance, value):
         if value is not None and isinstance(value, str):
             try:
-                value = pytz.timezone(self.datetime_timezone).localize(datetime.datetime.strptime(value, self.datetime_format))
+                dt = datetime.datetime.strptime(value, self.datetime_format)
+                value = pytz.timezone(self.datetime_timezone).localize(dt) if dt.tzinfo is None or dt.tzinfo.utcoffset(dt) is None else dt
             except:
                 raise Exception('Error parsing date ' + str(value) + ' with given format ' + str(self.datetime_format))
         if value is not None and not isinstance(value, datetime.datetime):
