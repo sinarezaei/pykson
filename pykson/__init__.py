@@ -22,6 +22,7 @@ class FieldType(Enum):
     TIME = 7
     DATETIME = 8
     DICT = 9
+    BYTES = 10
 
 
 class Field(JsonSerializable):
@@ -90,6 +91,16 @@ class StringField(Field):
 
     def __init__(self, serialized_name: Optional[str] = None, null: bool = True):
         super(StringField, self).__init__(field_type=FieldType.STRING, serialized_name=serialized_name, null=null)
+
+
+class BytesField(Field):
+    def __set__(self, instance, value):
+        if value is not None and not isinstance(value, bytes):
+            raise TypeError(instance, self.name, bytes, value)
+        super().__set__(instance, value)
+
+    def __init__(self, serialized_name: Optional[str] = None, null: bool = True):
+        super(BytesField, self).__init__(field_type=FieldType.BYTES, serialized_name=serialized_name, null=null)
 
 
 class MultipleChoiceStringField(Field):
