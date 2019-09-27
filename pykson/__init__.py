@@ -706,3 +706,6 @@ class Pykson:
 
     def to_json(self, item: Union[T, List[T]]) -> str:
         return json.dumps(self._to_json(item))
+
+    def to_dict_or_list(self, item: Union[T, List[T]]) -> Union[Dict[str, Any], List[Dict[str, Any]]]:
+        return self._to_json(item)
