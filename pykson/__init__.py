@@ -412,7 +412,7 @@ class JsonObjectMeta(type):
                 elif extra_attributes is not None and key in extra_attributes:
                     _setattr(instance_self, key, value)
                 elif not accept_unknown:
-                    raise Exception("value given in instance initialization but was not defined in model as Field. key:" + str(key) +
+                    raise Exception("value given in instance initialization but was not defined in model class (" + str(type(instance_self)) + ")as Field. key:" + str(key) +
                                     " val:" + str(value) + " type(value):" + str(type(value)))
 
         new_class.__init__ = my_custom_init
@@ -588,7 +588,8 @@ class Pykson:
         extra_attributes = []  # type: List[str]
 
         for type_hierarchy_adapter in self.type_hierarchy_adapters:
-            if type_hierarchy_adapter.base_class == cls:
+            # if type_hierarchy_adapter.base_class == cls:
+            if issubclass(cls, type_hierarchy_adapter.base_class):
                 subtype_key = data.get(type_hierarchy_adapter.type_key, None)
                 if subtype_key is None:
                     raise Exception('No sub-type key provided in class of type ' + str(cls) + ' for type key ' + str(type_hierarchy_adapter.type_key))
