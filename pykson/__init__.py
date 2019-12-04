@@ -4,6 +4,8 @@ import six
 import pytz
 import json
 import datetime
+# noinspection PyPackageRequirements
+from dateutil import parser
 
 # name = "pykson"
 
@@ -264,16 +266,19 @@ class DateTimeField(Field):
 
     def __set__(self, instance, value):
         if value is not None and isinstance(value, str):
-            try:
-                dt = datetime.datetime.strptime(value, self.datetime_format)
-                value = pytz.timezone(self.datetime_timezone).localize(dt) if dt.tzinfo is None or dt.tzinfo.utcoffset(dt) is None else dt
-            except:
-                raise Exception('Error parsing date ' + str(value) + ' with given format ' + str(self.datetime_format))
+            if self.datetime_format:
+                try:
+                    dt = datetime.datetime.strptime(value, self.datetime_format)
+                except:
+                    raise Exception('Error parsing date ' + str(value) + ' with given format ' + str(self.datetime_format))
+            else:
+                dt = parser.parse(value)
+            value = pytz.timezone(self.datetime_timezone).localize(dt) if dt.tzinfo is None or dt.tzinfo.utcoffset(dt) is None else dt
         if value is not None and not isinstance(value, datetime.datetime):
             raise TypeError(instance, self.name, datetime.datetime, value)
         super().__set__(instance, value)
 
-    def __init__(self, datetime_format: str = '%Y-%m-%d %H:%M:%S', datetime_timezone: str = 'UTC', serialized_name: Optional[str] = None, null: bool = True):
+    def __init__(self, datetime_format: Optional[str] = '%Y-%m-%d %H:%M:%S', datetime_timezone: str = 'UTC', serialized_name: Optional[str] = None, null: bool = True):
         super(DateTimeField, self).__init__(field_type=FieldType.DATETIME, serialized_name=serialized_name, null=null)
         self.datetime_format = datetime_format
         self.datetime_timezone = datetime_timezone
