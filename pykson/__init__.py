@@ -1,11 +1,13 @@
 from enum import Enum
 from typing import Dict, Any, List, Optional, TypeVar, Union, Type, Set, Sized, Generic
 import six
+import csv
 import pytz
 import json
 import datetime
 # noinspection PyPackageRequirements
 from dateutil import parser
+
 
 # name = "pykson"
 
@@ -56,34 +58,68 @@ class Field(JsonSerializable):
 
 class IntegerField(Field):
     def __set__(self, instance, value):
+        if value is not None and isinstance(value, str) and self.accepts_string:
+            value = int(value)
         if value is not None and not isinstance(value, int):
             raise TypeError(instance, self.name, int, value)
+        if self.min_value is not None:
+            assert value >= self.min_value
+        if self.max_value is not None:
+            assert value <= self.max_value
         super().__set__(instance, value)
 
-    def __init__(self, serialized_name: Optional[str] = None, null: bool = True):
+    def __init__(self, serialized_name: Optional[str] = None, null: bool = True, accepts_string: bool = False,
+                 min_value: Optional[int] = None, max_value: Optional[int] = None):
         super(IntegerField, self).__init__(field_type=FieldType.INTEGER, serialized_name=serialized_name, null=null)
+        self.accepts_string = accepts_string
+        assert min_value is None or isinstance(min_value, int)
+        assert max_value is None or isinstance(max_value, int)
+        if min_value is not None and max_value is not None:
+            assert min_value <= max_value
+        self.min_value = min_value
+        self.max_value = max_value
 
 
 class FloatField(Field):
     def __set__(self, instance, value):
+        if value is not None and isinstance(value, str) and self.accepts_string:
+            value = float(value)
         if value is not None and isinstance(value, int):
             value = float(value)
         if value is not None and not isinstance(value, float):
             raise TypeError(instance, self.name, float, value)
+        if self.min_value is not None:
+            assert value >= self.min_value
+        if self.max_value is not None:
+            assert value <= self.max_value
         super().__set__(instance, value)
 
-    def __init__(self, serialized_name: Optional[str] = None, null: bool = True):
+    def __init__(self, serialized_name: Optional[str] = None, null: bool = True, accepts_string: bool = False,
+                 min_value: Optional[float] = None, max_value: Optional[float] = None):
         super(FloatField, self).__init__(field_type=FieldType.FLOAT, serialized_name=serialized_name, null=null)
+        self.accepts_string = accepts_string
+        assert min_value is None or isinstance(min_value, float)
+        assert max_value is None or isinstance(max_value, float)
+        if min_value is not None and max_value is not None:
+            assert min_value <= max_value
+        self.min_value = min_value
+        self.max_value = max_value
 
 
 class BooleanField(Field):
     def __set__(self, instance, value):
+        if value is not None and isinstance(value, str) and value in ['True', 'False', 'true', 'false'] and self.accepts_string:
+            if value in ['True', 'true']:
+                value = True
+            elif value in ['False', 'false']:
+                value = False
         if value is not None and not isinstance(value, bool):
             raise TypeError(instance, self.name, bool, value)
         super().__set__(instance, value)
 
-    def __init__(self, serialized_name: Optional[str] = None, null: bool = True):
+    def __init__(self, serialized_name: Optional[str] = None, null: bool = True, accepts_string: bool = False):
         super(BooleanField, self).__init__(field_type=FieldType.BOOLEAN, serialized_name=serialized_name, null=null)
+        self.accepts_string = accepts_string
 
 
 class StringField(Field):
@@ -446,7 +482,6 @@ class ObjectField(Field):
 
 
 class ObjectListField(Field, List[T], Generic[T]):
-
     def __len__(self) -> int:
         raise Exception("Must use len on instance value not on field")
 
@@ -466,7 +501,6 @@ class ObjectListField(Field, List[T], Generic[T]):
 
 
 class TypeHierarchyAdapter:
-
     def __init__(self,
                  base_class: Type[T],
                  type_key: str,
@@ -637,6 +671,16 @@ class Pykson:
             # noinspection PyUnresolvedReferences
             list_result.append(self.from_json(data_value_item, cls, accept_unknown))
         return list_result
+
+    def from_csv(self, data: str, cls: Type[T], line_separator: str = '\n', first_row_as_field_names: bool = True, accept_unknown: bool = False) -> Optional[List[T]]:
+        data_items = data.split(line_separator)
+        if first_row_as_field_names:
+            reader_list = csv.DictReader(data_items)
+        else:
+            field_names = Pykson.__get_fields_mapped_by_serialized_names(cls=cls).keys()
+            reader_list = csv.DictReader(data_items, fieldnames=field_names)
+        rows = [r for r in reader_list]
+        return self._from_json_list(rows, cls=cls, accept_unknown=accept_unknown)
 
     def from_json(self, data: Union[str, Dict, List], cls: Type[T], accept_unknown: bool = False) -> Optional[Union[T, List[T]]]:
         if isinstance(data, str):
