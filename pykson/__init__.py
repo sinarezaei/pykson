@@ -672,7 +672,7 @@ class Pykson:
             list_result.append(self.from_json(data_value_item, cls, accept_unknown))
         return list_result
 
-    def from_csv(self, data: str, cls: Type[T], line_separator: str = '\n', first_row_as_field_names: bool = True, accept_unknown: bool = False) -> Optional[List[T]]:
+    def from_csv(self, data: str, cls: Type[T], line_separator: str = '\n', first_row_as_field_names: bool = True, accept_unknown: bool = False) -> List[T]:
         data_items = data.split(line_separator)
         if first_row_as_field_names:
             reader_list = csv.DictReader(data_items)
