@@ -4,6 +4,7 @@ import six
 import csv
 import pytz
 import json
+import copy
 import datetime
 # noinspection PyPackageRequirements
 from dateutil import parser
@@ -434,6 +435,8 @@ class JsonObjectMeta(type):
             else:
                 setattr(new_class, field_name, field)
 
+        user_defined_init = new_class.__init__
+
         # noinspection PyUnusedLocal
         def my_custom_init(instance_self, accept_unknown: bool = False, extra_attributes: Optional[List[str]] = None, *init_args, **init_kwargs):
             instance_self._data = {}  # dict.fromkeys(attrs.keys())
@@ -447,6 +450,9 @@ class JsonObjectMeta(type):
                 if field_key not in init_kwargs.keys():
                     _setattr(instance_self, field_key, None)
 
+            if extra_attributes is not None:
+                init_kwargs.update(extra_attributes)
+
             for key, value in init_kwargs.items():
                 if key in model_field_names:
                     _setattr(instance_self, key, value)
@@ -456,7 +462,12 @@ class JsonObjectMeta(type):
                     raise Exception("value given in instance initialization but was not defined in model class (" + str(type(instance_self)) + ")as Field. key:" + str(key) +
                                     " val:" + str(value) + " type(value):" + str(type(value)))
 
-        new_class.__init__ = my_custom_init
+                # if user_defined_init != JsonObject.__init__:
+                #     user_defined_init(instance_self)
+
+        # if the user has not defined the default init, or the name is JsonObject, override the init
+        if user_defined_init == object.__init__ or name == "JsonObject":
+            new_class.__init__ = my_custom_init
         return new_class
 
 
