@@ -450,8 +450,9 @@ class JsonObjectMeta(type):
                 if field_key not in init_kwargs.keys():
                     _setattr(instance_self, field_key, None)
 
-            if extra_attributes is not None:
-                init_kwargs.update(extra_attributes)
+            # if extra_attributes is not None:
+            #     print(extra_attributes)
+            #     init_kwargs.update(extra_attributes)
 
             for key, value in init_kwargs.items():
                 if key in model_field_names:
