@@ -131,12 +131,15 @@ class BooleanField(Field):
 
 class StringField(Field):
     def __set__(self, instance, value):
+        if value is not None and not isinstance(value, str) and self.accepts_non_string:
+            value = str(value)
         if value is not None and not isinstance(value, str):
             raise TypeError(instance, self.name, str, value)
         super().__set__(instance, value)
 
-    def __init__(self, serialized_name: Optional[str] = None, null: bool = True):
+    def __init__(self, serialized_name: Optional[str] = None, null: bool = True, accepts_non_string: bool = False):
         super(StringField, self).__init__(field_type=FieldType.STRING, serialized_name=serialized_name, null=null)
+        self.accepts_non_string = accepts_non_string
 
 
 class BytesField(Field):
