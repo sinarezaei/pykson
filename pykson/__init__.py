@@ -59,8 +59,11 @@ class Field(JsonSerializable):
 
 class IntegerField(Field):
     def __set__(self, instance, value):
-        if value is not None and isinstance(value, str) and self.accepts_string:
-            value = int(value)
+        if value is not None and isinstance(value, str) and value != '' and self.accepts_string:
+            try:
+                value = int(value)
+            except Exception:
+                pass
         if value is not None and not isinstance(value, int):
             raise TypeError(instance, self.name, int, value)
         if self.min_value is not None:
@@ -83,8 +86,11 @@ class IntegerField(Field):
 
 class FloatField(Field):
     def __set__(self, instance, value):
-        if value is not None and isinstance(value, str) and self.accepts_string:
-            value = float(value)
+        if value is not None and isinstance(value, str) and value != '' and self.accepts_string:
+            try:
+                value = float(value)
+            except Exception:
+                pass
         if value is not None and isinstance(value, int):
             value = float(value)
         if value is not None and not isinstance(value, float):
