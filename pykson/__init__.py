@@ -88,7 +88,7 @@ class FloatField(Field):
         if value is not None and isinstance(value, str) and value != '' and self.accepts_string:
             try:
                 value = float(value)
-            except Exception:
+            except ValueError:
                 pass
         if value is not None and isinstance(value, int):
             value = float(value)
@@ -273,7 +273,7 @@ class DateField(Field):
         if value is not None and isinstance(value, str):
             try:
                 value = datetime.datetime.strptime(value, self.date_format).date()
-            except:
+            except ValueError:
                 raise Exception('Error parsing date ' + str(value) + ' with given format ' + str(self.date_format))
         if value is not None and not isinstance(value, datetime.date):
             raise TypeError(instance, self.name, datetime.date, value)
@@ -292,7 +292,7 @@ class TimeField(Field):
         if value is not None and isinstance(value, str):
             try:
                 value = datetime.datetime.strptime(value, self.time_format).time()
-            except:
+            except ValueError:
                 raise Exception('Error parsing time ' + str(value) + ' with given format ' + str(self.time_format))
         if value is not None and not isinstance(value, datetime.time):
             raise TypeError(instance, self.name, datetime.time, value)
@@ -314,7 +314,7 @@ class DateTimeField(Field):
             if self.datetime_format:
                 try:
                     dt = datetime.datetime.strptime(value, self.datetime_format)
-                except:
+                except ValueError:
                     raise Exception('Error parsing date ' + str(value) + ' with given format ' + str(self.datetime_format))
             else:
                 dt = parser.parse(value)
