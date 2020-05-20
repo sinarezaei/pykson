@@ -177,11 +177,11 @@ class MultipleChoiceStringField(Field):
             raise Exception("Invalid type for options passed for multiple choice string field, must be either set or list but found " + str(type(options)))
         if len(options) == 0:
             raise Exception("Empty options passed for enum string field")
-        if len(options) != len(set(options)):
-            raise Exception("Duplicate values passed for options of multiple choice string field")
         for option in options:
             if not isinstance(option, str):
                 raise Exception("Invalid value in options of multiple choice string field, " + str(option) + ', expected str value but found ' + str(type(option)))
+        if len(options) != len(set(options)):
+            raise Exception("Duplicate values passed for options of multiple choice string field")
         self.options = set(options)
 
 
@@ -229,11 +229,11 @@ class MultipleChoiceIntegerField(Field):
             raise Exception("Invalid type for options passed for multiple choice integer field, must be either set or list but found " + str(type(options)))
         if len(options) == 0:
             raise Exception("Empty options passed for multiple choice integer field")
-        if len(options) != len(set(options)):
-            raise Exception("Duplicate values passed for options of multiple choice integer field")
         for option in options:
             if not isinstance(option, int):
                 raise Exception("Invalid value in options of multiple choice integer field, " + str(option) + ', expected int value but found ' + str(type(option)))
+        if len(options) != len(set(options)):
+            raise Exception("Duplicate values passed for options of multiple choice integer field")
         self.options = set(options)
 
 
@@ -256,11 +256,11 @@ class EnumIntegerField(Field):
         options = [e.value for e in enum]
         if len(options) == 0:
             raise Exception("Enum with no values passed for enum integer field")
-        if len(options) != len(set(options)):
-            raise Exception("Duplicate values passed for options of enum integer field")
         for option in options:
             if not isinstance(option, int):
                 raise Exception("Invalid value in enum integer field, " + str(option) + ', expected int value but found ' + str(type(option)))
+        if len(options) != len(set(options)):
+            raise Exception("Duplicate values passed for options of enum integer field")
         self.enum_options = [e for e in enum]
         self.options = set(options)
 
