@@ -1,10 +1,9 @@
 from enum import Enum
-from typing import Dict, Any, List, Optional, TypeVar, Union, Type, Set, Sized, Generic
+from typing import Dict, Any, List, Optional, TypeVar, Union, Type, Set, Generic
 import six
 import csv
 import pytz
 import json
-import copy
 import datetime
 # noinspection PyPackageRequirements
 from dateutil import parser
@@ -89,7 +88,7 @@ class FloatField(Field):
         if value is not None and isinstance(value, str) and value != '' and self.accepts_string:
             try:
                 value = float(value)
-            except Exception:
+            except ValueError:
                 pass
         if value is not None and isinstance(value, int):
             value = float(value)
@@ -178,11 +177,11 @@ class MultipleChoiceStringField(Field):
             raise Exception("Invalid type for options passed for multiple choice string field, must be either set or list but found " + str(type(options)))
         if len(options) == 0:
             raise Exception("Empty options passed for enum string field")
-        if len(options) != len(set(options)):
-            raise Exception("Duplicate values passed for options of multiple choice string field")
         for option in options:
             if not isinstance(option, str):
                 raise Exception("Invalid value in options of multiple choice string field, " + str(option) + ', expected str value but found ' + str(type(option)))
+        if len(options) != len(set(options)):
+            raise Exception("Duplicate values passed for options of multiple choice string field")
         self.options = set(options)
 
 
@@ -205,11 +204,11 @@ class EnumStringField(Field):
         options = [e.value for e in enum]
         if len(options) == 0:
             raise Exception("Enum with no values for enum string field")
-        if len(options) != len(set(options)):
-            raise Exception("Duplicate values passed for options of enum string field")
         for option in options:
             if not isinstance(option, str):
                 raise Exception("Invalid value in enum string field, " + str(option) + ', expected str value but found ' + str(type(option)))
+        if len(options) != len(set(options)):
+            raise Exception("Duplicate values passed for options of enum string field")
         self.enum_options = [e for e in enum]
         self.options = set(options)
 
@@ -230,11 +229,11 @@ class MultipleChoiceIntegerField(Field):
             raise Exception("Invalid type for options passed for multiple choice integer field, must be either set or list but found " + str(type(options)))
         if len(options) == 0:
             raise Exception("Empty options passed for multiple choice integer field")
-        if len(options) != len(set(options)):
-            raise Exception("Duplicate values passed for options of multiple choice integer field")
         for option in options:
             if not isinstance(option, int):
                 raise Exception("Invalid value in options of multiple choice integer field, " + str(option) + ', expected int value but found ' + str(type(option)))
+        if len(options) != len(set(options)):
+            raise Exception("Duplicate values passed for options of multiple choice integer field")
         self.options = set(options)
 
 
@@ -257,11 +256,11 @@ class EnumIntegerField(Field):
         options = [e.value for e in enum]
         if len(options) == 0:
             raise Exception("Enum with no values passed for enum integer field")
-        if len(options) != len(set(options)):
-            raise Exception("Duplicate values passed for options of enum integer field")
         for option in options:
             if not isinstance(option, int):
                 raise Exception("Invalid value in enum integer field, " + str(option) + ', expected int value but found ' + str(type(option)))
+        if len(options) != len(set(options)):
+            raise Exception("Duplicate values passed for options of enum integer field")
         self.enum_options = [e for e in enum]
         self.options = set(options)
 
@@ -274,7 +273,7 @@ class DateField(Field):
         if value is not None and isinstance(value, str):
             try:
                 value = datetime.datetime.strptime(value, self.date_format).date()
-            except:
+            except ValueError:
                 raise Exception('Error parsing date ' + str(value) + ' with given format ' + str(self.date_format))
         if value is not None and not isinstance(value, datetime.date):
             raise TypeError(instance, self.name, datetime.date, value)
@@ -293,7 +292,7 @@ class TimeField(Field):
         if value is not None and isinstance(value, str):
             try:
                 value = datetime.datetime.strptime(value, self.time_format).time()
-            except:
+            except ValueError:
                 raise Exception('Error parsing time ' + str(value) + ' with given format ' + str(self.time_format))
         if value is not None and not isinstance(value, datetime.time):
             raise TypeError(instance, self.name, datetime.time, value)
@@ -315,7 +314,7 @@ class DateTimeField(Field):
             if self.datetime_format:
                 try:
                     dt = datetime.datetime.strptime(value, self.datetime_format)
-                except:
+                except ValueError:
                     raise Exception('Error parsing date ' + str(value) + ' with given format ' + str(self.datetime_format))
             else:
                 dt = parser.parse(value)
