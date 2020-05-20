@@ -1,10 +1,9 @@
 from enum import Enum
-from typing import Dict, Any, List, Optional, TypeVar, Union, Type, Set, Sized, Generic
+from typing import Dict, Any, List, Optional, TypeVar, Union, Type, Set, Generic
 import six
 import csv
 import pytz
 import json
-import copy
 import datetime
 # noinspection PyPackageRequirements
 from dateutil import parser
@@ -205,11 +204,11 @@ class EnumStringField(Field):
         options = [e.value for e in enum]
         if len(options) == 0:
             raise Exception("Enum with no values for enum string field")
-        if len(options) != len(set(options)):
-            raise Exception("Duplicate values passed for options of enum string field")
         for option in options:
             if not isinstance(option, str):
                 raise Exception("Invalid value in enum string field, " + str(option) + ', expected str value but found ' + str(type(option)))
+        if len(options) != len(set(options)):
+            raise Exception("Duplicate values passed for options of enum string field")
         self.enum_options = [e for e in enum]
         self.options = set(options)
 
