@@ -605,6 +605,22 @@ class Pykson:
         return child_list
 
     @staticmethod
+    def __get_json_object_bases(cls_type: type, include_type: bool = False) -> List[type]:
+        list_items: List[type] = []
+        if include_type and issubclass(cls_type, JsonObject) and cls_type != JsonObject:
+            list_items.append(
+                cls_type
+            )
+        for base in cls_type.__bases__:
+            if issubclass(base, JsonObject) and base != JsonObject:
+                list_items.append(base)
+                for base_2 in base.__bases__:
+                    list_items.extend(
+                        Pykson.__get_json_object_bases(base_2, include_type=True)
+                    )
+        return list_items
+
+    @staticmethod
     def __get_field_and_child_values_as_dict(json_object) -> Dict[str, Any]:
         fields_dict = {}
         type_dicts = type(json_object).__dict__
@@ -619,7 +635,15 @@ class Pykson:
                 field_serialized_name = n
                 field_value = json_object.__getattribute__(field_name)
                 fields_dict[field_serialized_name] = field_value
-        for base in type(json_object).__bases__:
+
+        bases_list: List[type] = Pykson.__get_json_object_bases(cls_type=type(json_object))
+        # for base in type(json_object).__bases__:
+        #     if issubclass(base, JsonObject):
+        #         print('base json object')
+        #         print(base)
+
+        # for base in type(json_object).__bases__:
+        for base in bases_list:
             type_dicts = base.__dict__
             for n, field in type_dicts.items():
                 if isinstance(field, Field):
@@ -743,7 +767,7 @@ class Pykson:
         else:
             fields_dict = Pykson.__get_field_and_child_values_as_dict(item)
             final_dict = {}
-            # check if item type exists in type hierarchi adapters
+            # check if item type exists in type hierarchy adapters
             for type_hierarchy_adapter in self.type_hierarchy_adapters:
                 if isinstance(item, type_hierarchy_adapter.base_class):
                     # find type from dictionary
