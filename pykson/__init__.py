@@ -2,6 +2,7 @@ from enum import Enum
 from typing import Dict, Any, List, Optional, TypeVar, Union, Type, Set, Generic
 import six
 import csv
+import copy
 import pytz
 import json
 import datetime
@@ -42,12 +43,13 @@ class Field(JsonSerializable):
         return instance._data.get(self.serialized_name, None)
 
     # noinspection PyProtectedMember
-    def __set__(self, instance, value):
+    def __set__(self, instance, value, test: bool = False):
         if not self.null:
             assert value is not None, "Null value passed for not nullable field \'" + self.name + "\' in class " + str(type(instance))
-        if instance is None:
-            raise Exception('Cannot access field without instance')
-        instance._data[self.serialized_name] = value
+        if test is False:
+            if instance is None:
+                raise Exception('Cannot access field without instance')
+            instance._data[self.serialized_name] = value
 
     def __init__(self, field_type: FieldType, serialized_name: Optional[str] = None, null: bool = True):
         self.field_type = field_type
@@ -57,7 +59,7 @@ class Field(JsonSerializable):
 
 
 class IntegerField(Field):
-    def __set__(self, instance, value):
+    def __set__(self, instance, value, test: bool = False):
         if value is not None and isinstance(value, str) and value != '' and self.accepts_string:
             try:
                 value = int(value)
@@ -69,7 +71,7 @@ class IntegerField(Field):
             assert value >= self.min_value
         if self.max_value is not None:
             assert value <= self.max_value
-        super().__set__(instance, value)
+        super().__set__(instance, value, test)
 
     def __init__(self, serialized_name: Optional[str] = None, null: bool = True, accepts_string: bool = False,
                  min_value: Optional[int] = None, max_value: Optional[int] = None):
@@ -84,7 +86,7 @@ class IntegerField(Field):
 
 
 class FloatField(Field):
-    def __set__(self, instance, value):
+    def __set__(self, instance, value, test: bool = False):
         if value is not None and isinstance(value, str) and value != '' and self.accepts_string:
             try:
                 value = float(value)
@@ -98,7 +100,7 @@ class FloatField(Field):
             assert value >= self.min_value
         if self.max_value is not None:
             assert value <= self.max_value
-        super().__set__(instance, value)
+        super().__set__(instance, value, test)
 
     def __init__(self, serialized_name: Optional[str] = None, null: bool = True, accepts_string: bool = False,
                  min_value: Optional[float] = None, max_value: Optional[float] = None):
@@ -113,7 +115,7 @@ class FloatField(Field):
 
 
 class BooleanField(Field):
-    def __set__(self, instance, value):
+    def __set__(self, instance, value, test: bool = False):
         if value is not None and isinstance(value, str) and value in ['True', 'False', 'true', 'false'] and self.accepts_string:
             if value in ['True', 'true']:
                 value = True
@@ -121,7 +123,7 @@ class BooleanField(Field):
                 value = False
         if value is not None and not isinstance(value, bool):
             raise TypeError(instance, self.name, bool, value)
-        super().__set__(instance, value)
+        super().__set__(instance, value, test)
 
     def __init__(self, serialized_name: Optional[str] = None, null: bool = True, accepts_string: bool = False):
         super(BooleanField, self).__init__(field_type=FieldType.BOOLEAN, serialized_name=serialized_name, null=null)
@@ -129,12 +131,12 @@ class BooleanField(Field):
 
 
 class StringField(Field):
-    def __set__(self, instance, value):
+    def __set__(self, instance, value, test: bool = False):
         if value is not None and not isinstance(value, str) and self.accepts_non_string:
             value = str(value)
         if value is not None and not isinstance(value, str):
             raise TypeError(instance, self.name, str, value)
-        super().__set__(instance, value)
+        super().__set__(instance, value, test)
 
     def __init__(self, serialized_name: Optional[str] = None, null: bool = True, accepts_non_string: bool = False):
         super(StringField, self).__init__(field_type=FieldType.STRING, serialized_name=serialized_name, null=null)
@@ -142,32 +144,32 @@ class StringField(Field):
 
 
 class BytesField(Field):
-    def __set__(self, instance, value):
+    def __set__(self, instance, value, test: bool = False):
         if value is not None and not isinstance(value, bytes):
             raise TypeError(instance, self.name, bytes, value)
-        super().__set__(instance, value)
+        super().__set__(instance, value, test)
 
     def __init__(self, serialized_name: Optional[str] = None, null: bool = True):
         super(BytesField, self).__init__(field_type=FieldType.BYTES, serialized_name=serialized_name, null=null)
 
 
 class ByteArrayField(Field):
-    def __set__(self, instance, value):
+    def __set__(self, instance, value, test: bool = False):
         if value is not None and not isinstance(value, bytearray):
             raise TypeError(instance, self.name, bytearray, value)
-        super().__set__(instance, value)
+        super().__set__(instance, value, test)
 
     def __init__(self, serialized_name: Optional[str] = None, null: bool = True):
         super(ByteArrayField, self).__init__(field_type=FieldType.BYTE_ARRAY, serialized_name=serialized_name, null=null)
 
 
 class MultipleChoiceStringField(Field):
-    def __set__(self, instance, value):
+    def __set__(self, instance, value, test: bool = False):
         if value is not None and not isinstance(value, str):
             raise TypeError(instance, self.name, str, value)
         if value is not None and not (value in self.options):
             raise ValueError('Invalid value ' + str(value) + ' not present in options ' + str(self.options))
-        super().__set__(instance, value)
+        super().__set__(instance, value, test)
 
     def __init__(self, options: Union[List[str], Set[str]], serialized_name: Optional[str] = None, null: bool = True):
         super(MultipleChoiceStringField, self).__init__(field_type=FieldType.STRING, serialized_name=serialized_name, null=null)
@@ -186,14 +188,14 @@ class MultipleChoiceStringField(Field):
 
 
 class EnumStringField(Field):
-    def __set__(self, instance, value):
+    def __set__(self, instance, value, test: bool = False):
         if value is not None and value in self.enum_options:
             value = value.value
         if value is not None and not isinstance(value, str):
             raise TypeError(instance, self.name, str, value)
         if value is not None and not (value in self.options):
             raise ValueError('Invalid value ' + str(value) + ' not present in enum values ' + str(self.options))
-        super().__set__(instance, value)
+        super().__set__(instance, value, test)
 
     def __init__(self, enum, serialized_name: Optional[str] = None, null: bool = True):
         super(EnumStringField, self).__init__(field_type=FieldType.STRING, serialized_name=serialized_name, null=null)
@@ -214,12 +216,12 @@ class EnumStringField(Field):
 
 
 class MultipleChoiceIntegerField(Field):
-    def __set__(self, instance, value):
+    def __set__(self, instance, value, test: bool = False):
         if value is not None and not isinstance(value, int):
             raise TypeError(instance, self.name, int, value)
         if value is not None and not (value in self.options):
             raise ValueError('Invalid value ' + str(value) + ' not present in options ' + str(self.options))
-        super().__set__(instance, value)
+        super().__set__(instance, value, test)
 
     def __init__(self, options: Union[List[int], Set[int]], serialized_name: Optional[str] = None, null: bool = True):
         super(MultipleChoiceIntegerField, self).__init__(field_type=FieldType.INTEGER, serialized_name=serialized_name, null=null)
@@ -238,14 +240,14 @@ class MultipleChoiceIntegerField(Field):
 
 
 class EnumIntegerField(Field):
-    def __set__(self, instance, value):
+    def __set__(self, instance, value, test: bool = False):
         if value is not None and value in self.enum_options:
             value = value.value
         if value is not None and not isinstance(value, int):
             raise TypeError(instance, self.name, int, value)
         if value is not None and not (value in self.options):
             raise ValueError('Invalid value ' + str(value) + ' not present in enum values ' + str(self.options))
-        super().__set__(instance, value)
+        super().__set__(instance, value, test)
 
     def __init__(self, enum, serialized_name: Optional[str] = None, null: bool = True):
         super(EnumIntegerField, self).__init__(field_type=FieldType.INTEGER, serialized_name=serialized_name, null=null)
@@ -269,7 +271,7 @@ class DateField(Field):
     def get_json_formatted_value(self, value):
         return datetime.date.strftime(value, self.date_format)
 
-    def __set__(self, instance, value):
+    def __set__(self, instance, value, test: bool = False):
         if value is not None and isinstance(value, str):
             try:
                 value = datetime.datetime.strptime(value, self.date_format).date()
@@ -277,7 +279,7 @@ class DateField(Field):
                 raise Exception('Error parsing date ' + str(value) + ' with given format ' + str(self.date_format))
         if value is not None and not isinstance(value, datetime.date):
             raise TypeError(instance, self.name, datetime.date, value)
-        super().__set__(instance, value)
+        super().__set__(instance, value, test)
 
     def __init__(self, date_format: str = '%Y-%m-%d', serialized_name: Optional[str] = None, null: bool = True):
         super(DateField, self).__init__(field_type=FieldType.DATE, serialized_name=serialized_name, null=null)
@@ -288,7 +290,7 @@ class TimeField(Field):
     def get_json_formatted_value(self, value):
         return datetime.time.strftime(value, self.time_format)
 
-    def __set__(self, instance, value):
+    def __set__(self, instance, value, test: bool = False):
         if value is not None and isinstance(value, str):
             try:
                 value = datetime.datetime.strptime(value, self.time_format).time()
@@ -296,7 +298,7 @@ class TimeField(Field):
                 raise Exception('Error parsing time ' + str(value) + ' with given format ' + str(self.time_format))
         if value is not None and not isinstance(value, datetime.time):
             raise TypeError(instance, self.name, datetime.time, value)
-        super().__set__(instance, value)
+        super().__set__(instance, value, test)
 
     def __init__(self, time_format: str = '%H:%M:%S', serialized_name: Optional[str] = None, null: bool = True):
         super(TimeField, self).__init__(field_type=FieldType.TIME, serialized_name=serialized_name, null=null)
@@ -309,7 +311,7 @@ class DateTimeField(Field):
             return None
         return datetime.datetime.strftime(value, self.datetime_format)
 
-    def __set__(self, instance, value):
+    def __set__(self, instance, value, test: bool = False):
         if value is not None and isinstance(value, str):
             if self.datetime_format:
                 try:
@@ -321,7 +323,7 @@ class DateTimeField(Field):
             value = pytz.timezone(self.datetime_timezone).localize(dt) if dt.tzinfo is None or dt.tzinfo.utcoffset(dt) is None else dt
         if value is not None and not isinstance(value, datetime.datetime):
             raise TypeError(instance, self.name, datetime.datetime, value)
-        super().__set__(instance, value)
+        super().__set__(instance, value, test)
 
     def __init__(self, datetime_format: Optional[str] = '%Y-%m-%d %H:%M:%S', datetime_timezone: str = 'UTC', serialized_name: Optional[str] = None, null: bool = True):
         super(DateTimeField, self).__init__(field_type=FieldType.DATETIME, serialized_name=serialized_name, null=null)
@@ -333,7 +335,7 @@ class TimestampSecondsField(Field):
     def get_json_formatted_value(self, value):
         return int(value.replace(tzinfo=pytz.timezone(self.datetime_timezone)).timestamp())
 
-    def __set__(self, instance, value):
+    def __set__(self, instance, value, test: bool = False):
         if value is not None and isinstance(value, int):
             try:
                 value = pytz.timezone(self.datetime_timezone).localize(datetime.datetime.fromtimestamp(float(value)))
@@ -341,7 +343,7 @@ class TimestampSecondsField(Field):
                 raise Exception('Error parsing timestamp (in seconds) ' + str(value))
         if value is not None and not isinstance(value, datetime.datetime):
             raise TypeError(instance, self.name, datetime.datetime, value)
-        super().__set__(instance, value)
+        super().__set__(instance, value, test)
 
     def __init__(self, datetime_timezone: str = 'UTC', serialized_name: Optional[str] = None, null: bool = True):
         super(TimestampSecondsField, self).__init__(field_type=FieldType.DATETIME, serialized_name=serialized_name, null=null)
@@ -352,7 +354,7 @@ class TimestampMillisecondsField(Field):
     def get_json_formatted_value(self, value):
         return int(value.replace(tzinfo=pytz.timezone(self.datetime_timezone)).timestamp() * 1000.0)
 
-    def __set__(self, instance, value):
+    def __set__(self, instance, value, test: bool = False):
         if value is not None and isinstance(value, int):
             try:
                 value = pytz.timezone(self.datetime_timezone).localize(datetime.datetime.fromtimestamp(float(value / 1000.0)))
@@ -360,7 +362,7 @@ class TimestampMillisecondsField(Field):
                 raise Exception('Error parsing timestamp (in milliseconds) ' + str(value))
         if value is not None and not isinstance(value, datetime.datetime):
             raise TypeError(instance, self.name, datetime.datetime, value)
-        super().__set__(instance, value)
+        super().__set__(instance, value, test)
 
     def __init__(self, datetime_timezone: str = 'UTC', serialized_name: Optional[str] = None, null: bool = True):
         super(TimestampMillisecondsField, self).__init__(field_type=FieldType.DATETIME, serialized_name=serialized_name, null=null)
@@ -368,10 +370,10 @@ class TimestampMillisecondsField(Field):
 
 
 class JsonField(Field):
-    def __set__(self, instance, value):
+    def __set__(self, instance, value, test: bool = False):
         if value is not None and not isinstance(value, dict):
             raise TypeError(instance, self.name, dict, value)
-        super().__set__(instance, value)
+        super().__set__(instance, value, test)
 
     def __init__(self, serialized_name: Optional[str] = None, null: bool = True):
         super(JsonField, self).__init__(field_type=FieldType.DICT, serialized_name=serialized_name, null=null)
@@ -381,20 +383,35 @@ F = TypeVar('F', bound=Field)
 
 
 class ListField(Field):
-    def __set__(self, instance, value):
+    def __set__(self, instance, value, test: bool = False):
         if value is not None and not isinstance(value, list):
             raise TypeError(instance, self.name, list, value)
         if value is None:
             value = []
+        values = []
         for item in value:
             assert item is not None, "Null item passed to ListField"
-            assert isinstance(item, self.item_type), "ListField items must be of " + str(self.item_type) + ", found " + str(type(item))
-        super().__set__(instance, value)
+            if isinstance(self.item_type, Field):
+                inst = JsonObject()
+                inst._data = {}
+                self.tmp = copy.deepcopy(self.item_type)
+                self.tmp.serialized_name = 'tmp'
+                self.tmp.__set__(instance=inst, value=item)
+                del self.tmp
+                values.append(inst._data['tmp'])
+            else:
+                assert isinstance(item, self.item_type), "ListField items must be of " + str(self.item_type) + \
+                                                         ", found " + str(type(item))
+                values.append(item)
+        super().__set__(instance, values, test)
 
-    def __init__(self, item_type: Type, serialized_name: Optional[str] = None, null: bool = True):
+    def __init__(self, item_type: Union[Type, Field], serialized_name: Optional[str] = None, null: bool = True):
         super(ListField, self).__init__(field_type=FieldType.LIST, serialized_name=serialized_name, null=null)
         valid_types = [int, str, bool, float]
-        assert item_type in valid_types, 'Invalid list item type ' + str(item_type) + 'must be in ' + str(valid_types)
+        if not isinstance(item_type, Field):
+            assert item_type in valid_types, 'Invalid list item type ' + str(item_type) + 'must be in ' + str(valid_types)
+        else:
+            assert item_type.serialized_name is None, 'List item type should not have serialized name'
         self.item_type = item_type
 
 
@@ -491,10 +508,10 @@ T = TypeVar('T', bound=JsonObject)
 
 
 class ObjectField(Field):
-    def __set__(self, instance, value):
+    def __set__(self, instance, value, test: bool = False):
         if value is not None and not isinstance(value, self.item_type):
             raise TypeError(instance, self.name, self.item_type, value)
-        super().__set__(instance, value)
+        super().__set__(instance, value, test)
 
     def __init__(self, item_type: Type[T], serialized_name: Optional[str] = None, null: bool = True):
         super(ObjectField, self).__init__(field_type=FieldType.LIST, serialized_name=serialized_name, null=null)
@@ -505,7 +522,7 @@ class ObjectListField(Field, List[T], Generic[T]):
     def __len__(self) -> int:
         raise Exception("Must use len on instance value not on field")
 
-    def __set__(self, instance, value):
+    def __set__(self, instance, value, test: bool = False):
         if value is not None and not isinstance(value, list):
             raise TypeError(instance, self.name, list, value)
         if value is None:
@@ -513,7 +530,7 @@ class ObjectListField(Field, List[T], Generic[T]):
         for item in value:
             assert item is not None, "Null item passed to ObjectListField"
             assert isinstance(item, self.item_type), "ObjectListField items must be of " + str(self.item_type) + ", found " + str(type(item))
-        super(ObjectListField, self).__set__(instance, value)
+        super(ObjectListField, self).__set__(instance, value, test)
 
     def __init__(self, item_type: Type[T], serialized_name: Optional[str] = None, null: bool = True):
         super(ObjectListField, self).__init__(field_type=FieldType.LIST, serialized_name=serialized_name, null=null)
@@ -686,8 +703,8 @@ class Pykson:
         field_names_mapped_by_serialized_names = Pykson.__get_field_names_mapped_by_serialized_names(sub_type)
         data_copy = {}
         for data_key, data_value in data.items():
-            if isinstance(data_value, list) and (data_key in fields_mapped_by_serialized_names.keys()) and isinstance(fields_mapped_by_serialized_names[data_key],
-                                                                                                                      ObjectListField):
+            if isinstance(data_value, list) and (data_key in fields_mapped_by_serialized_names.keys()) and \
+                    isinstance(fields_mapped_by_serialized_names[data_key], ObjectListField):
                 data_list_value = []
                 for data_value_item in data_value:
                     # noinspection PyUnresolvedReferences
@@ -695,6 +712,14 @@ class Pykson:
                         self.from_json(data_value_item, fields_mapped_by_serialized_names[data_key].item_type, accept_unknown=accept_unknown)
                     )
                 data_copy[field_names_mapped_by_serialized_names[data_key]] = data_list_value
+            # elif isinstance(data_value, list) and (data_key in fields_mapped_by_serialized_names.keys()) and \
+            #         isinstance(fields_mapped_by_serialized_names[data_key], ListField) and \
+            #         isinstance(fields_mapped_by_serialized_names[data_key].item_type, Field):
+            #     if fields_mapped_by_serialized_names[data_key].item_type:
+            #         if data_key in field_names_mapped_by_serialized_names.keys():
+            #             data_copy[field_names_mapped_by_serialized_names[data_key]] = data_value
+            #         else:
+            #             data_copy[data_key] = data_value
             elif data_key in children_mapped_by_serialized_names.keys() and isinstance(data_value, dict):
                 data_copy[data_key] = self.from_json(data_value, type(children_mapped_by_serialized_names[data_key]), accept_unknown=accept_unknown)
             elif data_key in fields_mapped_by_serialized_names.keys() and isinstance(fields_mapped_by_serialized_names[data_key], ObjectField):
