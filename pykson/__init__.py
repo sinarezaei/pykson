@@ -541,9 +541,11 @@ class TypeHierarchyAdapter:
     def __init__(self,
                  base_class: Type[T],
                  type_key: str,
-                 subtype_key_values: Dict[str, Type[T]]):
+                 subtype_key_values: Dict[str, Type[T]],
+                 accept_sub_type: bool = False):
         self.base_class = base_class
         self.type_key = type_key
+        self.accept_sub_type = accept_sub_type
         self.subtype_key_values = subtype_key_values
 
 
@@ -689,7 +691,8 @@ class Pykson:
 
         for type_hierarchy_adapter in self.type_hierarchy_adapters:
             # if type_hierarchy_adapter.base_class == cls:
-            if issubclass(cls, type_hierarchy_adapter.base_class):
+            if (type_hierarchy_adapter.accept_sub_type is True and issubclass(cls, type_hierarchy_adapter.base_class)) \
+                    or type_hierarchy_adapter.base_class == cls:
                 subtype_key = data.get(type_hierarchy_adapter.type_key, None)
                 if subtype_key is None:
                     raise Exception('No sub-type key provided in class of type ' + str(cls) + ' for type key ' + str(type_hierarchy_adapter.type_key))
