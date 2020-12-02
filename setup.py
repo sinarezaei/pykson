@@ -1,8 +1,7 @@
 from setuptools import setup, find_packages
-from pip.req import parse_requirements
+with open('requirements.txt') as f:
+    required = f.read().splitlines()
 
-install_reqs = parse_requirements('requirements.txt')
-reqs = [str(ir.req) for ir in install_reqs]
 setup(name='funniest',
       version='0.9.9.8.3',
       description='Json Serializer/Deserializer for python',
@@ -11,5 +10,5 @@ setup(name='funniest',
       author_email='sinarezaei1991@gmail.com',
       license='MIT',
       packages = find_packages(),
-      install_requires=reqs,
+      install_requires=required,
       zip_safe=False) 
