@@ -1,5 +1,6 @@
 from setuptools import setup, find_packages
 
+install_reqs = parse_requirements(<requirements_path>)
 reqs = [str(ir.req) for ir in install_reqs]
 setup(name='funniest',
       version='0.9.9.8.3',
