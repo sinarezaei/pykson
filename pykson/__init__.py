@@ -782,12 +782,12 @@ class Pykson:
                 field_name = field.name
                 field_serialized_name = field.serialized_name
                 field_value = json_object.__getattribute__(field_name)
-                fields_dict[field_serialized_name] = field.get_json_formatted_value(field_value)
+                fields_dict[field_name] = field.get_json_formatted_value(field_value)
             elif isinstance(field, JsonObject):
                 field_name = n
                 field_serialized_name = n
                 field_value = json_object.__getattribute__(field_name)
-                fields_dict[field_serialized_name] = field_value
+                fields_dict[field_name] = field_value
 
         bases_list: List[type] = Pykson.__get_json_object_bases(cls_type=type(json_object))
         # for base in type(json_object).__bases__:
