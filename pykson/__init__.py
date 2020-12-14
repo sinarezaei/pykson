@@ -782,7 +782,7 @@ class Pykson:
                 field_name = field.name
                 field_serialized_name = field.serialized_name
                 field_value = json_object.__getattribute__(field_name)
-                fields_dict[ if serialized_keys_based else field_name] = field.get_json_formatted_value(field_value)
+                fields_dict[field_serialized_name if serialized_keys_based else field_name] = field.get_json_formatted_value(field_value)
             elif isinstance(field, JsonObject):
                 field_name = n
                 field_serialized_name = n
