@@ -808,7 +808,7 @@ class Pykson:
         return list_items
 
     @staticmethod
-    def __get_field_and_child_values_as_dict(json_object) -> Dict[str, Any]:
+    def __get_field_and_child_values_as_dict(json_object, serialized_keys_based) -> Dict[str, Any]:
         fields_dict = {}
         type_dicts = type(json_object).__dict__
         for n, field in type_dicts.items():
@@ -816,12 +816,12 @@ class Pykson:
                 field_name = field.name
                 field_serialized_name = field.serialized_name
                 field_value = json_object.__getattribute__(field_name)
-                fields_dict[field_serialized_name] = field.get_json_formatted_value(field_value)
+                fields_dict[field_serialized_name if serialized_keys_based else field_name] = field.get_json_formatted_value(field_value)
             elif isinstance(field, JsonObject):
                 field_name = n
                 field_serialized_name = n
                 field_value = json_object.__getattribute__(field_name)
-                fields_dict[field_serialized_name] = field_value
+                fields_dict[field_serialized_name if serialized_keys_based else field_name] = field_value
 
         bases_list: List[type] = Pykson.__get_json_object_bases(cls_type=type(json_object))
         # for base in type(json_object).__bases__:
@@ -963,14 +963,14 @@ class Pykson:
     #             final_dict[field_key] = field_value
     #     return final_dict
 
-    def _to_json(self, item: Union[T, List[T]]) -> Union[Dict[str, Any], List[Dict[str, Any]]]:
+    def _to_json(self, item: Union[T, List[T]], serialized_keys_based: bool = True) -> Union[Dict[str, Any], List[Dict[str, Any]]]:
         if isinstance(item, list):
             final_list = []
             for i in item:
                 final_list.append(self._to_json(i))
             return final_list
         else:
-            fields_dict = Pykson.__get_field_and_child_values_as_dict(item)
+            fields_dict = Pykson.__get_field_and_child_values_as_dict(item, serialized_keys_based)
             final_dict = {}
             # check if item type exists in type hierarchy adapters
             for type_hierarchy_adapter in self.type_hierarchy_adapters:
