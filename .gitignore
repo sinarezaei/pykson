@@ -2,7 +2,7 @@
 /build
 /dist
 __pycache__/
-setup.py
+setup.txt
 */sample.py
 /.eggs
 

@@ -246,10 +246,12 @@ class MultipleChoiceStringField(Field):
         assert default_value is None or (isinstance(default_value, str) and default_value in self.options)
 
 
+# noinspection DuplicatedCode
 class EnumStringField(Field):
     def __set__(self, instance, value, test: bool = False):
         if value is not None and value in self.enum_options:
-            value = value.value
+            if not isinstance(value, str):
+                value = value.value
         if value is not None and not isinstance(value, str):
             raise TypeError(instance, self.name, str, value)
         if value is not None and not (value in self.options):
@@ -317,7 +319,8 @@ class MultipleChoiceIntegerField(Field):
 class EnumIntegerField(Field):
     def __set__(self, instance, value, test: bool = False):
         if value is not None and value in self.enum_options:
-            value = value.value
+            if not isinstance(value, int):
+                value = value.value
         if value is not None and not isinstance(value, int):
             raise TypeError(instance, self.name, int, value)
         if value is not None and not (value in self.options):
@@ -349,6 +352,7 @@ class EnumIntegerField(Field):
         assert default_value is None or (isinstance(default_value, int) and default_value in self.options)
 
 
+# noinspection DuplicatedCode
 class DateField(Field):
     def get_json_formatted_value(self, value):
         if value is None:
@@ -542,6 +546,7 @@ class ListField(Field):
 
 
 class JsonObjectMeta(type):
+
     @staticmethod
     def __get_class_hierarchy_field_names(cls) -> List[str]:
         tmp_class_dict = cls.__dict__
@@ -551,6 +556,29 @@ class JsonObjectMeta(type):
             if issubclass(base, JsonSerializable):
                 model_field_names.extend(JsonObjectMeta.__get_class_hierarchy_field_names(base))
         return model_field_names
+
+    # noinspection DuplicatedCode
+    @staticmethod
+    def __get_fields(cls) -> List[Field]:
+        fields_list = []
+        type_dicts = cls.__dict__  # type(self).__dict__
+        for n, field in type_dicts.items():
+            if isinstance(field, Field):
+                fields_list.append(field)
+        for base in cls.__bases__:
+            base_type_dicts = base.__dict__  # type(self).__dict__
+            for n, field in base_type_dicts.items():
+                if isinstance(field, Field):
+                    fields_list.append(field)
+        return fields_list
+
+    @staticmethod
+    def __get_fields_mapped_by_names(cls) -> Dict[str, Field]:
+        result_dict = {}
+        fields_list = JsonObjectMeta.__get_fields(cls)
+        for field_item in fields_list:
+            result_dict[field_item.name] = field_item
+        return result_dict
 
     def __new__(mcs, name, bases, attrs: Dict[str, Any]):
         m_module = attrs.pop('__module__')
@@ -601,10 +629,16 @@ class JsonObjectMeta(type):
             _setattr(instance_self, 'serialized_name', None)
 
             model_field_names = JsonObjectMeta.__get_class_hierarchy_field_names(instance_self.__class__)
+            model_fields_by_name = JsonObjectMeta.__get_fields_mapped_by_names(instance_self.__class__)
+
+            print(model_fields_by_name)
 
             for field_key in model_field_names:
                 if field_key not in init_kwargs.keys():
-                    _setattr(instance_self, field_key, None)
+                    if field_key in model_fields_by_name.keys():
+                        _setattr(instance_self, field_key, model_fields_by_name[field_key].default_value)
+                    else:
+                        _setattr(instance_self, field_key, None)
 
             # if extra_attributes is not None:
             #     print(extra_attributes)
