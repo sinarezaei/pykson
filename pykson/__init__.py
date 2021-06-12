@@ -6,6 +6,7 @@ import copy
 import pytz
 import json
 import datetime
+import jdatetime
 # noinspection PyPackageRequirements
 from dateutil import parser
 
@@ -52,7 +53,8 @@ class Field(JsonSerializable):
                 raise Exception('Cannot access field without instance')
             instance._data[self.serialized_name] = value
 
-    def __init__(self, field_type: FieldType,
+    def __init__(self,
+                 field_type: FieldType,
                  serialized_name: Optional[str] = None,
                  null: bool = True,
                  default_value: Optional[Any] = None):
@@ -439,6 +441,60 @@ class DateTimeField(Field):
         self.datetime_format = datetime_format
         self.datetime_timezone = datetime_timezone
         assert default_value is None or isinstance(default_value, datetime.datetime)
+
+
+class JDateField(Field):
+    def get_json_formatted_value(self, value):
+        return jdatetime.date.strftime(value, self.date_format)
+
+    def __set__(self, instance, value, test: bool = False):
+        if value is not None and isinstance(value, str):
+            try:
+                value = jdatetime.datetime.strptime(value, self.date_format).date()
+            except Exception as ex:
+                raise Exception('Error parsing date ' + str(value) + ' with given format ' +
+                                str(self.date_format) + ', error: ' + str(ex))
+        if value is not None and not isinstance(value, jdatetime.date):
+            raise TypeError(instance, self.name, jdatetime.date, value)
+        super().__set__(instance, value)
+
+    def __init__(self, date_format: str = '%Y-%m-%d', serialized_name: Optional[str] = None, null: bool = True):
+        super(JDateField, self).__init__(field_type=FieldType.STRING, serialized_name=serialized_name, null=null)
+        self.date_format = date_format
+
+
+class JDateTimeField(Field):
+    def get_json_formatted_value(self, value):
+        if value is None:
+            return None
+        return jdatetime.datetime.strftime(value, self.datetime_format)
+
+    def __set__(self, instance, value, test: bool = False):
+        if value is not None and isinstance(value, str):
+            try:
+                dt = jdatetime.datetime.strptime(value, self.datetime_format)
+            except ValueError:
+                raise Exception(
+                    'Error parsing date ' + str(value) + ' with given format ' + str(self.datetime_format))
+            value = pytz.timezone(self.datetime_timezone).localize(dt) \
+                if dt.tzinfo is None or dt.tzinfo.utcoffset(dt) is None else dt
+        if value is not None and not isinstance(value, jdatetime.datetime):
+            raise TypeError(instance, self.name, jdatetime.datetime, value)
+        super().__set__(instance, value, test)
+
+    def __init__(self,
+                 datetime_format: str = '%Y-%m-%d %H:%M:%S',
+                 datetime_timezone: str = 'UTC',
+                 serialized_name: Optional[str] = None,
+                 null: bool = True,
+                 default_value: Optional[datetime.datetime] = None):
+        super(JDateTimeField, self).__init__(field_type=FieldType.STRING,
+                                             serialized_name=serialized_name,
+                                             null=null,
+                                             default_value=default_value)
+        self.datetime_format = datetime_format
+        self.datetime_timezone = datetime_timezone
+        assert default_value is None or isinstance(default_value, jdatetime.datetime)
 
 
 class TimestampSecondsField(Field):
