@@ -735,8 +735,17 @@ class ObjectField(Field):
             raise TypeError(instance, self.name, self.item_type, value)
         super().__set__(instance, value, test)
 
-    def __init__(self, item_type: Type[T], serialized_name: Optional[str] = None, null: bool = True):
-        super(ObjectField, self).__init__(field_type=FieldType.LIST, serialized_name=serialized_name, null=null)
+    def __init__(self,
+                 item_type: Type[T],
+                 serialized_name: Optional[str] = None,
+                 null: bool = True,
+                 default_value: Optional[Any] = None):
+        super(ObjectField, self).__init__(
+            field_type=FieldType.LIST,
+            serialized_name=serialized_name,
+            null=null,
+            default_value=default_value)
+        assert default_value is None or isinstance(default_value, JsonObject)
         self.item_type = item_type
 
 
