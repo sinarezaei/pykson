@@ -623,9 +623,7 @@ class JsonObjectMeta(type):
                 fields_list.append(field)
         for base in cls.__bases__:
             base_type_dicts = base.__dict__  # type(self).__dict__
-            for n, field in base_type_dicts.items():
-                if isinstance(field, Field):
-                    fields_list.append(field)
+            fields_list += JsonObjectMeta.__get_fields(base)
         return fields_list
 
     @staticmethod
