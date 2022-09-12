@@ -751,6 +751,9 @@ class ObjectListField(Field, List[T], Generic[T]):
             value = []
         for item in value:
             assert item is not None, "Null item passed to ObjectListField"
+            if not isinstance(item, self.item_type) and isinstance(item, dict) and issubclass(self.item_type, JsonObject):
+                super(ObjectListField, self).__set__(instance, Pykson().from_json(value, self.item_type), test)
+                return
             assert isinstance(item, self.item_type), "ObjectListField items must be of " + str(
                 self.item_type) + ", found " + str(type(item))
         super(ObjectListField, self).__set__(instance, value, test)
