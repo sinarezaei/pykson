@@ -7,9 +7,9 @@ with open('requirements.txt') as f:
     required = f.read().splitlines()
 
 setuptools.setup(name='pykson',
-                 version='0.9.9.8.7',
-                 author='Sina Rezaei',
-                 author_email='sinarezaei1991@gmail.com',
+                 version='1.0.1',
+                 author='Sina Rezaei, Patrick J. Pereira',
+                 author_email='sinarezaei1991@gmail.com, patrickelectric@gmail.com',
                  long_description_content_type="text/markdown",
                  long_description=long_description,
                  description='Pykson: A JSON Serializer/Deserializer for Python',
