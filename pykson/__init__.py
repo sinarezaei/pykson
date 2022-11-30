@@ -798,6 +798,9 @@ class ObjectListField(Field, List[T], Generic[T]):
     def __set__(self, instance, value, test: bool = False):
         if value is not None and not isinstance(value, list):
             raise TypeError(instance, self.name, list, value)
+        if value is None and self.null is False:
+            raise Exception(f'Null value passed for not nullable ObjectListField \'{self.name}\' in class '
+                            f'{type(instance)}')
         for item in value:
             assert item is not None, "Null item passed to ObjectListField"
             assert isinstance(item, self.item_type), "ObjectListField items must be of " + str(
