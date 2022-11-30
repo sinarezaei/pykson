@@ -1,3 +1,4 @@
+import decimal
 from enum import Enum
 from typing import Dict, Any, List, Optional, TypeVar, Union, Type, Set, Generic
 import six
@@ -551,6 +552,27 @@ class TimestampMillisecondsField(Field):
                                                          default_value=default_value)
         self.datetime_timezone = datetime_timezone
         assert default_value is None or isinstance(default_value, datetime.datetime)
+
+
+class DecimalField(Field):
+    def __set__(self, instance, value, test: bool = False):
+        if value is not None and isinstance(value, str) and self.accepts_string:
+            value = decimal.Decimal(value)
+        if value is not None and not isinstance(value, decimal.Decimal):
+            raise TypeError(instance, self.name, decimal.Decimal, value)
+        super().__set__(instance, value, test)
+
+    def __init__(self, serialized_name: Optional[str] = None,
+                 null: bool = True,
+                 default_value: Optional[decimal.Decimal] = None,
+                 accepts_string: bool = False,
+                 ):
+        super(DecimalField, self).__init__(field_type=FieldType.STRING,
+                                           serialized_name=serialized_name,
+                                           null=null,
+                                           default_value=default_value)
+        self.accepts_string = accepts_string
+        assert default_value is None or isinstance(default_value, str)
 
 
 class JsonField(Field):
