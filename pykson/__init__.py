@@ -674,9 +674,7 @@ class JsonObjectMeta(type):
                 fields_list.append(field)
         for base in cls.__bases__:
             base_type_dicts = base.__dict__  # type(self).__dict__
-            for n, field in base_type_dicts.items():
-                if isinstance(field, Field):
-                    fields_list.append(field)
+            fields_list += JsonObjectMeta.__get_fields(base)
         return fields_list
 
     @staticmethod
@@ -776,18 +774,32 @@ class JsonObject(six.with_metaclass(JsonObjectMeta, JsonSerializable)):
         # Empty init will be replaced by meta class
         super(JsonObject, self).__init__()
 
+    def __str__(self):
+        return json.dumps(json.loads(Pykson().to_json(self)), indent=2, sort_keys=True)
 
 T = TypeVar('T', bound=JsonObject)
 
 
 class ObjectField(Field):
     def __set__(self, instance, value, test: bool = False):
+        if isinstance(value, dict) and issubclass(self.item_type, JsonObject):
+            super().__set__(instance, Pykson().from_json(value, self.item_type), test)
+            return
         if value is not None and not isinstance(value, self.item_type):
             raise TypeError(instance, self.name, self.item_type, value)
         super().__set__(instance, value, test)
 
-    def __init__(self, item_type: Type[T], serialized_name: Optional[str] = None, null: bool = True):
-        super(ObjectField, self).__init__(field_type=FieldType.LIST, serialized_name=serialized_name, null=null)
+    def __init__(self,
+                 item_type: Type[T],
+                 serialized_name: Optional[str] = None,
+                 null: bool = True,
+                 default_value: Optional[Any] = None):
+        super(ObjectField, self).__init__(
+            field_type=FieldType.LIST,
+            serialized_name=serialized_name,
+            null=null,
+            default_value=default_value)
+        assert default_value is None or isinstance(default_value, JsonObject)
         self.item_type = item_type
 
 
@@ -803,6 +815,9 @@ class ObjectListField(Field, List[T], Generic[T]):
                             f'{type(instance)}')
         for item in value:
             assert item is not None, "Null item passed to ObjectListField"
+            if not isinstance(item, self.item_type) and isinstance(item, dict) and issubclass(self.item_type, JsonObject):
+                super(ObjectListField, self).__set__(instance, Pykson().from_json(value, self.item_type), test)
+                return
             assert isinstance(item, self.item_type), "ObjectListField items must be of " + str(
                 self.item_type) + ", found " + str(type(item))
         super(ObjectListField, self).__set__(instance, value, test)
