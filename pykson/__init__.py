@@ -32,6 +32,7 @@ class FieldType(Enum):
     DICT = 9
     BYTES = 10
     BYTE_ARRAY = 11
+    FUNCTION = 12
 
 
 class Field(JsonSerializable):
@@ -614,6 +615,22 @@ class JsonField(Field):
         super(JsonField, self).__init__(field_type=FieldType.DICT, serialized_name=serialized_name, null=null)
 
 
+class FunctionField(Field):
+    def __get__(self, instance, owner):
+        if instance is None:
+            raise Exception('Cannot access field without instance')
+        func = getattr(instance, self.function_name)
+        return func()
+
+    def __set__(self, instance, value, test: bool = False):
+        raise Exception(f'Function field is not settable. trying to set function {self.function_name} '
+                        f'of class {type(instance)} to value {value}')
+
+    def __init__(self, function_name, serialized_name: Optional[str] = None, null: bool = True):
+        self.function_name = function_name
+        super(FunctionField, self).__init__(field_type=FieldType.FUNCTION, serialized_name=serialized_name, null=null)
+
+
 F = TypeVar('F', bound=Field)
 
 
@@ -743,6 +760,8 @@ class JsonObjectMeta(type):
             for field_key in model_field_names:
                 if field_key not in init_kwargs.keys():
                     if field_key in model_fields_by_name.keys():
+                        if isinstance(model_fields_by_name[field_key], FunctionField):
+                            continue
                         _setattr(instance_self, field_key, model_fields_by_name[field_key].default_value)
                     else:
                         _setattr(instance_self, field_key, None)
@@ -753,6 +772,8 @@ class JsonObjectMeta(type):
 
             for key, value in init_kwargs.items():
                 if key in model_field_names:
+                    if isinstance(model_fields_by_name[key], FunctionField):
+                        raise Exception(f'Cannot set value of a FunctionField, field name: {key}, value {value}')
                     _setattr(instance_self, key, value)
                 elif extra_attributes is not None and key in extra_attributes:
                     _setattr(instance_self, key, value)
