@@ -1077,7 +1077,9 @@ class Pykson:
                     final_dict[field_key] = field_value
             return final_dict
 
-    def to_json(self, item: Union[T, List[T]]) -> str:
+    def to_json(self, item: Union[T, List[T]], indent: bool = True) -> str:
+        if indent:
+            return json.dumps(self._to_json(item), indent=2, sort_keys=True)
         return json.dumps(self._to_json(item))
 
     def to_dict_or_list(self, item: Union[T, List[T]]) -> Union[Dict[str, Any], List[Dict[str, Any]]]:
