@@ -845,6 +845,18 @@ class TypeHierarchyAdapter:
         self.subtype_key_values = subtype_key_values
 
 
+class PyksonEncoder(json.JSONEncoder):
+    def default(self, obj):
+        # 👇️ if passed in object is instance of Decimal
+        # convert it to a string
+        if isinstance(obj, decimal.Decimal):
+            return str(obj)
+        elif isinstance(obj, uuid.UUID):
+            return str(obj)
+        # 👇️ otherwise use the default behavior
+        return json.JSONEncoder.default(self, obj)
+
+
 # noinspection DuplicatedCode
 class Pykson:
     @staticmethod
@@ -1136,7 +1148,7 @@ class Pykson:
             return final_dict
 
     def to_json(self, item: Union[T, List[T]]) -> str:
-        return json.dumps(self._to_json(item))
+        return json.dumps(self._to_json(item), cls=PyksonEncoder)
 
     def to_dict_or_list(self, item: Union[T, List[T]]) -> Union[Dict[str, Any], List[Dict[str, Any]]]:
         return self._to_json(item)
