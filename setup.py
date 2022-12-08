@@ -7,7 +7,7 @@ with open('requirements.txt') as f:
     required = f.read().splitlines()
 
 setuptools.setup(name='pykson',
-                 version='1.0.1',
+                 version='1.0.2',
                  author='Sina Rezaei, Patrick J. Pereira',
                  author_email='sinarezaei1991@gmail.com, patrickelectric@gmail.com',
                  long_description_content_type="text/markdown",
