@@ -822,10 +822,11 @@ class ObjectListField(Field, List[T], Generic[T]):
         if value is None and self.null is False:
             raise Exception(f'Null value passed for not nullable ObjectListField \'{self.name}\' in class '
                             f'{type(instance)}')
-        for item in value:
-            assert item is not None, "Null item passed to ObjectListField"
-            assert isinstance(item, self.item_type), "ObjectListField items must be of " + str(
-                self.item_type) + ", found " + str(type(item))
+        if value is not None:
+            for item in value:
+                assert item is not None, "Null item passed to ObjectListField"
+                assert isinstance(item, self.item_type), "ObjectListField items must be of " + str(
+                    self.item_type) + ", found " + str(type(item))
         super(ObjectListField, self).__set__(instance, value, test)
 
     def __init__(self, item_type: Type[T], serialized_name: Optional[str] = None, null: bool = True):
