@@ -568,7 +568,7 @@ class DecimalField(Field):
     def __init__(self, serialized_name: Optional[str] = None,
                  null: bool = True,
                  default_value: Optional[decimal.Decimal] = None,
-                 accepts_string: bool = False,
+                 accepts_string: bool = True,
                  ):
         super(DecimalField, self).__init__(field_type=FieldType.STRING,
                                            serialized_name=serialized_name,
@@ -1063,6 +1063,8 @@ class Pykson:
 
     def from_csv(self, data: str, cls: Type[T], line_separator: str = '\n', first_row_as_field_names: bool = True,
                  accept_unknown: bool = False) -> List[T]:
+        assert issubclass(cls, JsonObject), 'cls must be subclass of JsonObject'
+        assert cls != JsonObject, 'Cannot convert to JsonObject'
         data_items = data.split(line_separator)
         if first_row_as_field_names:
             reader_list = csv.DictReader(data_items)
@@ -1074,6 +1076,8 @@ class Pykson:
 
     def from_json(self, data: Union[str, Dict, List], cls: Type[T], accept_unknown: bool = False
                   ) -> Optional[Union[T, List[T]]]:
+        assert issubclass(cls, JsonObject), 'cls must be subclass of JsonObject'
+        assert cls != JsonObject, 'Cannot convert to JsonObject'
         if isinstance(data, str):
             data = json.loads(data)
         if isinstance(data, dict):
@@ -1147,8 +1151,11 @@ class Pykson:
                     final_dict[field_key] = field_value
             return final_dict
 
-    def to_json(self, item: Union[T, List[T]]) -> str:
-        return json.dumps(self._to_json(item), cls=PyksonEncoder)
+    def to_json(self, item: Union[T, List[T]], base_indent: Optional[int] = None, indent: Optional[int] = None) -> str:
+        j_str = json.dumps(self._to_json(item), cls=PyksonEncoder, indent=indent)
+        if base_indent:
+            j_str.replace('\n', ''.join([' ' for i in range(0, base_indent)]) + '\n')
+        return j_str
 
     def to_dict_or_list(self, item: Union[T, List[T]]) -> Union[Dict[str, Any], List[Dict[str, Any]]]:
         return self._to_json(item)

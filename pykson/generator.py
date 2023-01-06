@@ -2,7 +2,7 @@ import re
 import _io
 import json
 from dateutil import parser
-from typing import List, Optional, Tuple, Dict, Set, Any
+from typing import List, Optional, Tuple, Dict, Set, Any, Union
 
 
 class PyksonGenerator:
@@ -92,29 +92,77 @@ class PyksonGenerator:
                 p.name: p for p in self.properties
             }
 
-        def is_similar(self, other_schema: 'PyksonGenerator.Schema'):
+        def _is_similar_keys(
+                self,
+                other_schema: 'PyksonGenerator.Schema',
+                is_sibling_in_list: bool = False
+        ) -> bool:
             prop_by_name = self.get_properties_by_name()
             other_prop_by_name = other_schema.get_properties_by_name()
-            return prop_by_name.keys() == other_prop_by_name.keys() and all([
-                PyksonGenerator._null_or_equal_type_strings(prop_by_name[n].type_str, other_prop_by_name[n].type_str)
-                and
-                (
-                    True if prop_by_name[n].type_str != list.__name__
-                    else PyksonGenerator._null_or_equal(
-                        prop_by_name[n].item_type_str, other_prop_by_name[n].item_type_str
-                    )
+            prop_keys = set(prop_by_name.keys())
+            other_prop_keys = set(other_prop_by_name.keys())
+            if is_sibling_in_list:
+                return len(prop_keys.intersection(other_prop_keys)) > 0
+            return (
+                    len([k for k in prop_keys if k not in other_prop_keys]) == 0
+                    or
+                    len([k for k in other_prop_keys if k not in prop_keys]) == 0
+                    or
+                    set(list(prop_keys)) == set(list(other_prop_keys))
                 )
-                for n in prop_by_name.keys()
-            ])
 
-        def update_from(self, other_schema: 'PyksonGenerator.Schema'):
-            assert self.is_similar(other_schema), 'Cannot update from non-similar schema'
+        def is_similar(
+                self,
+                other_schema: 'PyksonGenerator.Schema',
+                is_sibling_in_list: bool = False
+        ) -> bool:
+            prop_by_name = self.get_properties_by_name()
+            other_prop_by_name = other_schema.get_properties_by_name()
+            prop_keys = list(prop_by_name.keys())
+            other_prop_keys = list(other_prop_by_name.keys())
+            all_keys = list(set(prop_keys + other_prop_keys))
+            # return prop_by_name.keys() == other_prop_by_name.keys() and all([
+            return self._is_similar_keys(other_schema, is_sibling_in_list) and \
+                all(
+                    [
+                        prop_by_name.get(n) is None or other_prop_by_name.get(n) is None or
+                        (
+                                PyksonGenerator._null_or_equal_type_strings(
+                                    prop_by_name[n].type_str,
+                                    other_prop_by_name[n].type_str
+                                )
+                                and
+                                (
+                                    True if prop_by_name[n].type_str != list.__name__
+                                    else PyksonGenerator._null_or_equal(
+                                        prop_by_name[n].item_type_str, other_prop_by_name[n].item_type_str
+                                    )
+                                )
+                        )
+                        for n in all_keys
+                    ]
+                )
+
+        def update_from(
+                self,
+                other_schema: 'PyksonGenerator.Schema',
+                is_sibling_in_list: bool = False
+        ):
+            assert self.is_similar(other_schema, is_sibling_in_list), 'Cannot update from non-similar schema'
             properties = self.properties
+            self_props = self.get_properties_by_name()
             other_props = other_schema.get_properties_by_name()
             for prop in properties:
-                other_prop: PyksonGenerator.SchemaProperty = other_props[prop.name]
+                other_prop: PyksonGenerator.SchemaProperty = other_props.get(prop.name)
+                if other_prop is None:
+                    if not is_sibling_in_list:
+                        raise Exception(f'Cannot find property {prop.name} in non sibling property')
+                    prop.nullable = True
+                    continue
                 if prop.type_str == 'NoneType' and other_prop.type_str != 'NoneType':
                     prop.type_str = other_prop.type_str
+                if prop.nullable is False and other_prop.nullable is True:
+                    prop.nullable = other_prop.nullable
                 if prop.type_str == list.__name__ and other_prop.type_str == list.__name__:
                     if prop.item_type_str is None and other_prop.item_type_str is not None:
                         prop.item_type_str = other_prop.item_type_str
@@ -123,24 +171,19 @@ class PyksonGenerator:
                         if prop.values is None:
                             prop.values = set()
                         prop.values.update(other_prop.values)
+            _self_props_keys = self_props.keys()
+            only_other_props = [p_v for p_n, p_v in other_props.items() if p_n not in _self_props_keys]
+            if not is_sibling_in_list and len(only_other_props) > 0:
+                raise Exception(f'Cannot update: Found properties {[p.name for p in only_other_props]} '
+                                f'which are not in this schema properties {[p.name for p in self_props.values()]}')
+            for only_other_prop in only_other_props:
+                properties.append(only_other_prop)
             self.properties = properties
 
     @staticmethod
     def _is_primitive(element) -> bool:
         if any([isinstance(element, cls) for cls in [int, str, float, bool, bytes]]):
             return True
-        elif isinstance(element, list):
-            list_of_primitives = all([
-                any([isinstance(list_item, cls) for cls in [int, str, float, bool, bytes]])
-                for list_item in element
-            ])
-            if list_of_primitives:
-                if len(set([type(list_item) for list_item in element])) <= 1:
-                    return True
-                else:
-                    raise Exception(f'List of non-similar items is not supported {element}')
-            else:
-                return False
         else:
             return False
 
@@ -168,7 +211,7 @@ class PyksonGenerator:
         for s in schema_list:
             if new_schema.is_similar(s):
                 found_new_schema = True
-                s.update_from(new_schema)
+                s.update_from(new_schema, True)
                 duplicate_schema = s
                 break
         if found_new_schema is False:
@@ -204,12 +247,12 @@ class PyksonGenerator:
                 else:
                     if len(value) == 0:
                         properties.append(PyksonGenerator.SchemaProperty(
-                            name=key, type_str=list.__name__, item_type_str=type(None).__str__
+                            name=key, type_str=list.__name__, item_type_str=type(None).__name__
                         ))
                     elif PyksonGenerator._is_list_of_primitives(value):
                         properties.append(
                             PyksonGenerator.SchemaProperty(
-                                name=key, type_str=list.__name__, item_type_str=type(value[0]).__str__
+                                name=key, type_str=list.__name__, item_type_str=type(value[0]).__name__
                             )
                         )
                     else:
@@ -226,11 +269,14 @@ class PyksonGenerator:
                             value_i_schema, value_i_sub_schemas = PyksonGenerator.generate_schema(
                                 value[i], list_item_name, sub_schemas
                             )
-                            if not value_0_schema.is_similar(value_i_schema):
-                                raise Exception(f'Non similar list schemas {value_0_schema} AND {value_i_schema} '
+                            if not value_0_schema.is_similar(value_i_schema, True):
+                                raise Exception(f'Non similar list schemas '
+                                                f'{value_0_schema} '
+                                                f'AND '
+                                                f'{value_i_schema} '
                                                 f'in list {list_item_name}')
                             else:
-                                value_0_schema.update_from(value_i_schema)
+                                value_0_schema.update_from(value_i_schema, True)
                         properties.append(PyksonGenerator.SchemaProperty(
                             name=key, type_str=list.__name__, item_type_str=value_0_schema_name
                         ))
@@ -264,6 +310,7 @@ class PyksonGenerator:
 
     @staticmethod
     def _to_snake_case(text: str) -> str:
+        text = re.sub(r'[A-Z]{2,}', lambda x: x.group(0)[0] + x.group(0)[1:].lower(), text)
         text = re.sub(r'(?<!^)(?=[A-Z])', '_', text).lower()
         for i in PyksonGenerator._initial_letter_replacements.keys():
             if text.startswith(i):
@@ -318,11 +365,11 @@ class PyksonGenerator:
                 bytes.__name__: 'BytesField',
             }
             primitive_field_to_pykson_field_type = {
-                int.__name__: int,
-                str.__name__: str,
-                float.__name__: float,
-                bool.__name__: bool,
-                bytes.__name__: bytes,
+                int.__name__: 'int',
+                str.__name__: 'str',
+                float.__name__: 'float',
+                bool.__name__: 'bool',
+                bytes.__name__: 'bytes',
             }
             if p.type_str in primitive_field_to_pykson_class.keys():
                 file_writer.write(
@@ -371,15 +418,21 @@ class PyksonGenerator:
                                   f'serialized_name="{p.name}", null={p.nullable})')
             file_writer.write('\n')
 
+
+
     # noinspection PyTypeChecker
     @staticmethod
     def generate_pykson_classes(
-            json_object: dict,
+            json_object: Union[dict, list],
             base_name: str,
             indent: str = '    ',
             generate_test: bool = False,
             include_todos: bool = True,
     ):
+        if isinstance(json_object, list):
+            json_object = {
+                'items': json_object
+            }
         schema, sub_schemas = PyksonGenerator.generate_schema(json_object, name=base_name)
         with open(f'pykson_{PyksonGenerator._to_snake_case(base_name)}.generated.py', 'w') as f:
             f.write('import pykson\n')
