@@ -796,6 +796,8 @@ class JsonObject(six.with_metaclass(JsonObjectMeta, JsonSerializable)):
         # Empty init will be replaced by meta class
         super(JsonObject, self).__init__()
 
+    def __str__(self):
+        return json.dumps(json.loads(Pykson().to_json(self)), indent=2, sort_keys=True)
 
 T = TypeVar('T', bound=JsonObject)
 
