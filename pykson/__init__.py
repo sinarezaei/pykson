@@ -802,6 +802,9 @@ T = TypeVar('T', bound=JsonObject)
 
 class ObjectField(Field):
     def __set__(self, instance, value, test: bool = False):
+        if isinstance(value, dict) and issubclass(self.item_type, JsonObject):
+            super().__set__(instance, Pykson().from_json(value, self.item_type), test)
+            return
         if value is not None and not isinstance(value, self.item_type):
             raise TypeError(instance, self.name, self.item_type, value)
         super().__set__(instance, value, test)
